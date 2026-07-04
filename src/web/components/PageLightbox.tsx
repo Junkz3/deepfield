@@ -55,12 +55,38 @@ export function PageLightbox() {
   const imgRef = useRef<HTMLImageElement>(null);
   const [imgH, setImgH] = useState(600);
   const [patchStyles, setPatchStyles] = useState<PatchStyle[]>([]);
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const [zoom, setZoom] = useState({ scale: 1, tx: 0, ty: 0 });
+  const drag = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
 
   const doc = lb ? docs.find((d) => d.id === lb.docId) : undefined;
   const idx = doc ? Math.max(0, doc.pages.findIndex((p) => p.page === lb!.page)) : 0;
 
   // Reset the translation state when the page changes.
   useEffect(() => { setTranslation(null); setBlocks(null); setTranslating(false); }, [lb?.docId, lb?.page]);
+  useEffect(() => { setZoom({ scale: 1, tx: 0, ty: 0 }); }, [lb?.docId, lb?.page]);
+
+  // Wheel zoom needs a non-passive native listener (React's root wheel is passive).
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setZoom((z) => {
+        const factor = e.deltaY < 0 ? 1.16 : 1 / 1.16;
+        const scale = Math.min(4.5, Math.max(1, z.scale * factor));
+        if (scale === 1) return { scale: 1, tx: 0, ty: 0 };
+        // keep the point under the cursor fixed while zooming
+        const r = el.getBoundingClientRect();
+        const cx = e.clientX - (r.left + r.width / 2);
+        const cy = e.clientY - (r.top + r.height / 2);
+        const k = scale / z.scale;
+        return { scale, tx: cx - k * (cx - z.tx), ty: cy - k * (cy - z.ty) };
+      });
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [lb?.docId, lb?.page]);
   useEffect(() => { setChapterLines(null); }, [lb?.docId]);
 
   useEffect(() => {
@@ -159,7 +185,31 @@ export function PageLightbox() {
             />
           </div>
         ) : (
-          <span className="cite-img-wrap zoomed page-rise" key={`${doc.id}-${page.page}`}>
+          <span
+            className={`cite-img-wrap zoomed page-rise ${zoom.scale > 1 ? 'panning' : ''}`}
+            key={`${doc.id}-${page.page}`}
+            ref={wrapRef}
+            style={zoom.scale > 1 ? { transform: `translate(${zoom.tx}px, ${zoom.ty}px) scale(${zoom.scale})` } : undefined}
+            onAnimationEnd={(e) => e.currentTarget.classList.remove('page-rise')}
+            onDoubleClick={(e) => {
+              if (zoom.scale > 1) { setZoom({ scale: 1, tx: 0, ty: 0 }); return; }
+              const r = e.currentTarget.getBoundingClientRect();
+              const cx = e.clientX - (r.left + r.width / 2);
+              const cy = e.clientY - (r.top + r.height / 2);
+              setZoom({ scale: 2.2, tx: cx - 2.2 * cx, ty: cy - 2.2 * cy });
+            }}
+            onMouseDown={(e) => {
+              if (zoom.scale === 1) return;
+              e.preventDefault();
+              drag.current = { x: e.clientX, y: e.clientY, tx: zoom.tx, ty: zoom.ty };
+            }}
+            onMouseMove={(e) => {
+              if (!drag.current) return;
+              setZoom((z) => ({ ...z, tx: drag.current!.tx + e.clientX - drag.current!.x, ty: drag.current!.ty + e.clientY - drag.current!.y }));
+            }}
+            onMouseUp={() => { drag.current = null; }}
+            onMouseLeave={() => { drag.current = null; }}
+          >
             <img
               ref={imgRef}
               src={page.imageUrl}

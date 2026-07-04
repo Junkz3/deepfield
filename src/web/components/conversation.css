@@ -779,3 +779,15 @@
   100% { transform: none; opacity: 1; filter: none; }
 }
 .page-rise { animation: rc-page-rise 0.42s cubic-bezier(0.22, 0.9, 0.3, 1) both; }
+
+/* ---- Page zoom (wheel / double-click / drag to pan) ---- */
+
+.cite-lightbox { overflow: hidden; }
+.cite-img-wrap.zoomed { will-change: transform; }
+.cite-img-wrap.zoomed.panning { cursor: grab; }
+.cite-img-wrap.zoomed.panning:active { cursor: grabbing; }
+
+/* Video fits the universe half too: bounded by width AND height */
+.cite-lightbox.docked .video-frame {
+  width: min(100%, calc(72vh * 16 / 9));
+}
