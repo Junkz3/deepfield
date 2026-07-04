@@ -22,7 +22,10 @@ export function Sidebar() {
     <aside className="sidebar">
       <div className="sidebar-brand">
         <span className="sidebar-brand-mark" />
-        RepairCenter
+        <span className="sidebar-brand-text">
+          RepairCenter
+          <span className="sidebar-brand-sub">built on Deepfield</span>
+        </span>
       </div>
 
       <button

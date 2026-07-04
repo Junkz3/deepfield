@@ -161,9 +161,9 @@ function OrbitRings() {
 
 const BOLT_PTS = 22;
 
-function makeBoltLine(color: string, opacity: number): THREE.Line {
+function makeBoltLine(color: string, opacity: number, pts = BOLT_PTS): THREE.Line {
   const geom = new THREE.BufferGeometry();
-  geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array((BOLT_PTS + 1) * 3), 3));
+  geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array((pts + 1) * 3), 3));
   const mat = new THREE.LineBasicMaterial({
     color, transparent: true, opacity,
     blending: THREE.AdditiveBlending, depthWrite: false,
@@ -219,6 +219,99 @@ function LightningBolt({ to, color, interval = 0.07 }: { to: THREE.Vector3; colo
   });
 
   return <group>{lines.map((l, i) => <primitive key={i} object={l} />)}</group>;
+}
+
+/* ---------- plasma globe internals: glass shell + contained filaments ---------- */
+
+const FIL_PTS = 12;
+
+/** One short filament inside the glass shell: same master-path + fuzz
+ *  technique as LightningBolt, but the tip wanders on the inner wall. */
+function PlasmaFilament({ radius, seed, active }: { radius: number; seed: number; active: boolean }) {
+  const lines = useMemo(
+    () => [makeBoltLine('#fff3df', 0.5, FIL_PTS), makeBoltLine('#ffb454', 0.28, FIL_PTS), makeBoltLine('#ff8f3d', 0.12, FIL_PTS)],
+    [],
+  );
+  useEffect(() => () => lines.forEach((l) => { l.geometry.dispose(); (l.material as THREE.Material).dispose(); }), [lines]);
+  const target = useRef(new THREE.Vector3(Math.cos(seed), 0.4 * Math.sin(seed * 2.3), Math.sin(seed)).normalize());
+  const retargetAt = useRef(0);
+  const acc = useRef(1);
+
+  useFrame(({ clock }, dt) => {
+    const t = clock.elapsedTime;
+    if (t >= retargetAt.current) {
+      target.current.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+      retargetAt.current = t + (active ? 0.15 + Math.random() * 0.15 : 0.4 + Math.random() * 0.5);
+    }
+    acc.current += dt;
+    if (acc.current < 0.085) return;
+    acc.current = 0;
+    const dir = target.current;
+    const to = dir.clone().multiplyScalar(radius);
+    const p1 = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0));
+    if (p1.lengthSq() < 1e-4) p1.set(1, 0, 0);
+    p1.normalize();
+    const p2 = new THREE.Vector3().crossVectors(dir, p1);
+    const mA = new Float32Array(FIL_PTS + 1);
+    const mB = new Float32Array(FIL_PTS + 1);
+    for (let i = 0; i <= FIL_PTS; i++) {
+      const env = Math.sin((i / FIL_PTS) * Math.PI) * radius * 0.16;
+      mA[i] = (Math.random() - 0.5) * 2 * env;
+      mB[i] = (Math.random() - 0.5) * 2 * env;
+    }
+    const fuzz = [0, 0.03, 0.07];
+    const baseOp = active ? [0.9, 0.5, 0.25] : [0.5, 0.28, 0.12];
+    lines.forEach((line, li) => {
+      (line.material as THREE.LineBasicMaterial).opacity = baseOp[li];
+      const pos = line.geometry.getAttribute('position') as THREE.BufferAttribute;
+      for (let i = 0; i <= FIL_PTS; i++) {
+        const tt = i / FIL_PTS;
+        const f = Math.sin(tt * Math.PI) * radius * fuzz[li];
+        const a = mA[i] + (Math.random() - 0.5) * 2 * f;
+        const b = mB[i] + (Math.random() - 0.5) * 2 * f;
+        pos.setXYZ(i,
+          to.x * tt + p1.x * a + p2.x * b,
+          to.y * tt + p1.y * a + p2.y * b,
+          to.z * tt + p1.z * a + p2.z * b);
+      }
+      pos.needsUpdate = true;
+    });
+  });
+
+  return <group>{lines.map((l, i) => <primitive key={i} object={l} />)}</group>;
+}
+
+/** Fresnel rim: invisible face-on, warm glowing edge that draws the globe. */
+function makeGlassShellMaterial(): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uColor: { value: new THREE.Color('#ffb454') },
+      uIntensity: { value: 0.45 },
+    },
+    vertexShader: `
+      varying vec3 vNormal;
+      varying vec3 vView;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vView = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform float uIntensity;
+      varying vec3 vNormal;
+      varying vec3 vView;
+      void main() {
+        float fres = pow(1.0 - abs(dot(normalize(vNormal), normalize(vView))), 3.0);
+        gl_FragColor = vec4(uColor, fres * uIntensity);
+      }
+    `,
+  });
 }
 
 /** While the agent scans, a few bolts probe in-scope files, retargeting
@@ -288,12 +381,14 @@ function IngestEmbryo() {
 
 function AgentCore({ scanning }: { scanning: boolean }) {
   const halo = useRef<THREE.Sprite>(null);
-  const pulse = useRef<THREE.Mesh>(null);
+  const nucleus = useRef<THREE.Mesh>(null);
   const gyroA = useRef<THREE.Group>(null);
   const gyroB = useRef<THREE.Group>(null);
   const gyroC = useRef<THREE.Group>(null);
   const orbiters = useRef<THREE.Points>(null);
   const haloMap = useMemo(() => radialSprite('255, 178, 92'), []);
+  const glassMat = useMemo(() => makeGlassShellMaterial(), []);
+  useEffect(() => () => glassMat.dispose(), [glassMat]);
 
   const orbiterGeom = useMemo(() => {
     const n = 42;
@@ -310,26 +405,22 @@ function AgentCore({ scanning }: { scanning: boolean }) {
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
-    if (halo.current) halo.current.scale.setScalar(1.35 + Math.sin(t * 1.1) * 0.07);
+    if (halo.current) {
+      halo.current.scale.setScalar(scanning ? 1.5 + Math.sin(t * 3.2) * 0.1 : 1.35 + Math.sin(t * 1.1) * 0.07);
+    }
+    if (nucleus.current) nucleus.current.scale.setScalar(scanning ? 1.12 + Math.sin(t * 11) * 0.06 : 1);
+    glassMat.uniforms.uIntensity.value = scanning ? 0.85 + Math.sin(t * 7) * 0.1 : 0.45 + Math.sin(t * 1.6) * 0.06;
     // gyroscope: three thin rings precessing on different axes
     if (gyroA.current) { gyroA.current.rotation.x = t * 0.42; gyroA.current.rotation.y = t * 0.18; }
     if (gyroB.current) { gyroB.current.rotation.y = -t * 0.31; gyroB.current.rotation.z = t * 0.22; }
     if (gyroC.current) { gyroC.current.rotation.z = t * 0.15; gyroC.current.rotation.x = -t * 0.26; }
     if (orbiters.current) orbiters.current.rotation.y = t * 0.5;
-    if (pulse.current) {
-      const phase = (t % 1.3) / 1.3;
-      pulse.current.visible = scanning;
-      if (scanning) {
-        pulse.current.scale.setScalar(0.3 + phase * R * 1.05);
-        (pulse.current.material as THREE.MeshBasicMaterial).opacity = 0.45 * (1 - phase);
-      }
-    }
   });
 
   return (
     <group>
       {/* white-hot nucleus in a warm shell */}
-      <mesh>
+      <mesh ref={nucleus}>
         <sphereGeometry args={[0.085, 24, 24]} />
         <meshBasicMaterial color="#fff7ea" />
       </mesh>
@@ -369,10 +460,14 @@ function AgentCore({ scanning }: { scanning: boolean }) {
         <pointsMaterial color="#ffd9a0" size={0.014} transparent opacity={0.8} depthWrite={false} blending={THREE.AdditiveBlending} sizeAttenuation />
       </points>
 
-      <mesh ref={pulse} rotation={[Math.PI / 2, 0, 0]} visible={false}>
-        <torusGeometry args={[1, 0.016, 8, 64]} />
-        <meshBasicMaterial color="#ffb454" transparent depthWrite={false} blending={THREE.AdditiveBlending} />
+      {/* glass shell + contained plasma filaments */}
+      <mesh material={glassMat}>
+        <sphereGeometry args={[0.46, 48, 48]} />
       </mesh>
+      {[0, 1, 2, 3].map((i) => (
+        <PlasmaFilament key={i} radius={0.44} seed={i * 2.7 + 1} active={scanning} />
+      ))}
+
       <pointLight intensity={40} distance={26} color="#ffd9a0" />
       <Billboard position={[0, -0.58, 0]}>
         <Text font={displayFont} fontSize={0.082} color="#b9884e" letterSpacing={0.5} anchorX="center" outlineWidth={0.003} outlineColor="#080b10">

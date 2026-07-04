@@ -26,6 +26,20 @@
   box-shadow: 0 0 12px var(--accent-glow);
 }
 
+.sidebar-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.sidebar-brand-sub {
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
 .sidebar-center {
   display: flex;
   align-items: center;

@@ -21,13 +21,24 @@ outside the conversation scope fade to ghosts.
 | Role | Model |
 |---|---|
 | Visual retrieval (two-stage rerank over page images) | vultr/VultronRetrieverPrime-Qwen3.5-8B |
-| Vision, diagnosis, translation (reads pages and photos) | nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16 |
-| Planning and sufficiency orchestration | moonshotai/Kimi-K2.6 |
+| Everything the agent thinks: planning, sufficiency, vision diagnosis, translation | nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16 |
+
+All agent reasoning runs on a single NVIDIA Nemotron model; measured on this workload it parses
+reliably and answers 2-3x faster than the larger generalist alternative once its reasoning is
+kept on a short leash.
 
 There is no vector store and no OCR pipeline in the retrieval path. Stage 1 narrows candidates by
 taxonomy scope plus a lexical prefilter; stage 2 lets VultronRetriever score the actual page
 images against the query. Scanned schematics and fold-outs rank correctly because the pages are
 seen, not text-extracted.
+
+## Beyond repair: the Deepfield engine
+
+Nothing in the engine is repair-specific. Visual retrieval over page images, automatic
+taxonomy, the navigable 3D universe and page-exact citations work on any document corpus.
+RepairCenter is the first app built on Deepfield: open the Studio (`/?studio`), name a
+workspace, drop a corpus, wire your tools, and the same plan-retrieve-cite loop serves legal
+discovery, clinical-trial matching or telecom field operations.
 
 ## Multilingual by design
 

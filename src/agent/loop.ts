@@ -69,7 +69,10 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     const pool = round === 0 ? candidates
       : candidates.filter((p) => !retrieved.some((r) => r.page.docId === p.docId && r.page.page === p.page));
     const results = await driver.retrieve(query, pool);
-    const top = results.filter((r) => r.score >= 1.5).slice(0, 3);
+    // Dynamic top: pages scoring within 85% of the best belong in the answer
+    // (a fixed top-3 dropped the right table entry when it ranked 4th).
+    const best = results[0]?.score ?? 0;
+    const top = results.filter((r) => r.score >= 1.5 && r.score >= best * 0.85).slice(0, 5);
     yield emit({
       phase: 'retrieve',
       summary: top.length > 0 ? `Found ${top.length} relevant page(s)` : 'No relevant pages found',
@@ -79,6 +82,21 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     retrieved.push(...top.filter((t) => !retrieved.some((r) => r.page.docId === t.page.docId && r.page.page === t.page.page)));
     if (retrieved.length === 0) break;
     if (videoIntent && retrieved.some((r) => r.page.kind === 'video-segment')) break; // media step: no depth needed
+
+    // Structural completeness check (free, local): with the fault page AND a
+    // schematic in hand - or a troubleshooting page in a scope that has no
+    // schematics at all - the assessor call is redundant.
+    const kinds = new Set(retrieved.map((r) => r.page.kind));
+    const scopeHasSchematic = candidates.some((p) => p.kind === 'schematic');
+    const structurallyDone =
+      ((kinds.has('error-table') || kinds.has('troubleshooting')) && kinds.has('schematic')) ||
+      (!scopeHasSchematic && (kinds.has('error-table') || kinds.has('troubleshooting')));
+    if (structurallyDone) {
+      evidenceIncomplete = false;
+      yield emit({ phase: 'retrieve', summary: 'Evidence structurally complete - proceeding to analysis' });
+      break;
+    }
+
     const verdict = await driver.assessSufficiency(q, retrieved);
     evidenceIncomplete = !verdict.sufficient;
     if (verdict.sufficient || !verdict.followupQuery) break;
@@ -158,7 +176,13 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   const exactCodeMatch = codes.length > 0 && retrieved.some((r) =>
     r.page.kind === 'error-table' ||
     codes.some((c) => (r.page.text ?? '').replace(/[-\s]/g, '').toLowerCase().includes(c)));
-  const conf = computeConfidence({ exactCodeMatch, corroboratingCitations: citations.length - 1, requiredPageMissing: evidenceIncomplete });
+  // Corroboration = distinct SOURCES (documents / page kinds), not raw count:
+  // six pages of the same manual are one voice, not five echoes.
+  const distinctSources = Math.max(
+    new Set(retrieved.map((r) => r.page.docId)).size,
+    new Set(retrieved.map((r) => r.page.kind)).size,
+  );
+  const conf = computeConfidence({ exactCodeMatch, corroboratingCitations: distinctSources - 1, requiredPageMissing: evidenceIncomplete });
   yield emit({ phase: 'decide', summary: `First check: ${diagnosis.checks[0]}` });
 
   // Proposed actions follow the DIAGNOSIS, not a fixed script. The machine

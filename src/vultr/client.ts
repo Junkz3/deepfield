@@ -48,14 +48,22 @@ function extractJson<T>(text: string, fallback: T): T {
   try { return JSON.parse(m[0]) as T; } catch { return fallback; }
 }
 
-// Fetch a page image (site asset) and inline it as a data URL for Vultr payloads.
+// Fetch a page image (site asset) and inline it as a data URL for Vultr
+// payloads. Cached: the same pages are re-sent across rounds and steps, and
+// re-encoding 24 images per round was pure waste (bounded, ~figures 50MB).
+const dataUrlCache = new Map<string, string>();
 async function toDataUrl(imageUrl: string): Promise<string> {
   if (imageUrl.startsWith('data:')) return imageUrl;
+  const hit = dataUrlCache.get(imageUrl);
+  if (hit) return hit;
   const res = await fetch(imageUrl);
   const buf = new Uint8Array(await res.arrayBuffer());
   let bin = '';
   for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-  return `data:image/png;base64,${btoa(bin)}`;
+  const out = `data:image/png;base64,${btoa(bin)}`;
+  if (dataUrlCache.size > 120) dataUrlCache.delete(dataUrlCache.keys().next().value!);
+  dataUrlCache.set(imageUrl, out);
+  return out;
 }
 
 export class VultrDriver implements ModelDriver {
@@ -68,8 +76,8 @@ export class VultrDriver implements ModelDriver {
     const userInput = q.userInput === 'find-video'
       ? 'Show the video walkthrough for this repair. Phrase the retrieval query as: video walkthrough <device> <faulty component> replacement.'
       : q.userInput;
-    const text = await chatText(this.t, MODELS.kimi,
-      `You are a repair agent planning evidence retrieval from a knowledge base that holds PAGINATED MANUAL PAGES and TIMESTAMPED VIDEO WALKTHROUGH SEGMENTS.\nDevice: ${q.device}\nSymptom: ${q.symptom}\nUser input: ${userInput ?? 'none'}\nReturn STRICT JSON: {"goal": string, "queries": [string]} - one focused retrieval query (error code table / troubleshooting first; start the query with "video walkthrough" when the user wants a demonstration). The retrieval query MUST be written in English (the corpus language) regardless of the user's language; write the goal in ${AGENT_LANG}.`, 8000);
+    const text = await chatText(this.t, MODELS.omni,
+      `You are a repair agent planning evidence retrieval from a knowledge base that holds PAGINATED MANUAL PAGES and TIMESTAMPED VIDEO WALKTHROUGH SEGMENTS.\nDevice: ${q.device}\nSymptom: ${q.symptom}\nUser input: ${userInput ?? 'none'}\nThis is quick planning, not analysis: keep any internal reasoning under 30 words. Return STRICT JSON: {"goal": string, "queries": [string]} - one focused retrieval query (error code table / troubleshooting first; start the query with "video walkthrough" when the user wants a demonstration). The retrieval query MUST be written in English (the corpus language) regardless of the user's language; write the goal in ${AGENT_LANG}.`, 8000);
     return extractJson<PlanAction>(text, { goal: `Diagnose ${q.symptom}`, queries: [`${q.device} ${q.symptom}`] });
   }
 
@@ -147,8 +155,8 @@ export class VultrDriver implements ModelDriver {
     const listing = found.map((f) =>
       `p.${f.page.page} [${f.page.kind}]${f.page.title ? ` "${f.page.title}"` : ''} score=${f.score.toFixed(1)}${f.page.text ? `\n  text: "${f.page.text.slice(0, 400).replace(/\n+/g, ' ')}"` : ''}`,
     ).join('\n');
-    const text = await chatText(this.t, MODELS.kimi,
-      `Repair diagnosis for ${q.device} - ${q.symptom}. Evidence retained so far:\n${listing}\nIMPORTANT: retrieval scored the page IMAGES; a page holds more than its text snippet. A page tagged [error-table] almost certainly contains the full error-code table even if the snippet cuts off before the code; a page tagged [schematic] IS a wiring/schematic page. ${this.scopeHasSchematic ? 'To point at a component you need BOTH the fault identification AND a wiring/schematic page.' : 'The scope contains NO schematic pages at all (user-guide material): a troubleshooting or diagnostic-procedure page is then SUFFICIENT - never demand a wiring diagram that does not exist here.'} Return STRICT JSON: {"sufficient": boolean, "reason": string, "followupQuery": string|null} - reason written in ${AGENT_LANG}; followupQuery = 3-8 plain English search KEYWORDS (e.g. "heating circuit wiring diagram"), NEVER a sentence or an instruction.`, 8000);
+    const text = await chatText(this.t, MODELS.omni,
+      `Repair diagnosis for ${q.device} - ${q.symptom}. Evidence retained so far:\n${listing}\nIMPORTANT: retrieval scored the page IMAGES; a page holds more than its text snippet. A page tagged [error-table] almost certainly contains the full error-code table even if the snippet cuts off before the code; a page tagged [schematic] IS a wiring/schematic page. ${this.scopeHasSchematic ? 'To point at a component you need BOTH the fault identification AND a wiring/schematic page.' : 'The scope contains NO schematic pages at all (user-guide material): a troubleshooting or diagnostic-procedure page is then SUFFICIENT - never demand a wiring diagram that does not exist here.'} This is a quick check, not analysis: keep any internal reasoning under 30 words. Return STRICT JSON: {"sufficient": boolean, "reason": string, "followupQuery": string|null} - reason written in ${AGENT_LANG}; followupQuery = 3-8 plain English search KEYWORDS (e.g. "heating circuit wiring diagram"), NEVER a sentence or an instruction.`, 8000);
     const v = extractJson(text, { sufficient: true, reason: 'assessment unavailable', followupQuery: null as string | null });
     return { sufficient: v.sufficient, reason: v.reason, followupQuery: v.followupQuery ?? undefined };
   }
