@@ -1,6 +1,6 @@
 interface Env { VULTR_INFERENCE_API_KEY: string; VULTR_BASE_URL?: string; DEMO_TOKEN?: string }
 
-const ALLOWED = new Set(['/chat/completions', '/rerank']);
+const ALLOWED = new Set(['/chat/completions', '/rerank', '/audio/speech']);
 let calls: number[] = []; // per-isolate naive rate limit
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
@@ -20,7 +20,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     headers: { authorization: `Bearer ${env.VULTR_INFERENCE_API_KEY}`, 'content-type': 'application/json' },
     body: JSON.stringify(payload.body),
   });
-  return new Response(res.body, { status: res.status, headers: { 'content-type': 'application/json' } });
+  // Relay the upstream content-type: /audio/speech streams binary audio.
+  return new Response(res.body, { status: res.status, headers: { 'content-type': res.headers.get('content-type') ?? 'application/json' } });
 };
 
 const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
