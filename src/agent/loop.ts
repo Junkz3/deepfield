@@ -108,15 +108,28 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   const exactCodeMatch = /e3|dtc/i.test(conversation.symptom) && retrieved.some((r) => r.page.kind === 'error-table');
   const conf = computeConfidence({ exactCodeMatch, corroboratingCitations: citations.length - 1, requiredPageMissing: false });
   yield emit({ phase: 'decide', summary: `First check: ${diagnosis.checks[0]}` });
+
+  // Proposed actions follow the DIAGNOSIS, not a fixed script.
+  const component = diagnosis.component.toLowerCase();
+  const proposedNext: { label: string; action: string }[] = [];
+  if (component.includes('heat')) {
+    proposedNext.push(
+      { label: 'Heater measured 22 ohms (in spec)', action: 'report-measurement:heating element:22' },
+      { label: 'Heater open circuit (0 ohms)', action: 'report-measurement:heating element:0' },
+    );
+  } else if (component.includes('thermistor') || component.includes('sensor')) {
+    proposedNext.push({ label: 'Sensor reads in spec', action: 'report-measurement:thermistor:52000' });
+  }
+  const hasVideo = candidates.some((p) => p.kind === 'video-segment');
+  if (hasVideo) proposedNext.push({ label: 'Show me the replacement video', action: 'find-video' });
+  if (citations.length > 1) proposedNext.push({ label: 'Show the corroborating page', action: 'show-citation:1' });
+  proposedNext.push({ label: 'Compile work order', action: 'compile-work-order' });
+
   return {
     index: conversation.steps.length, phaseEvents: events,
     instruction: `${diagnosis.cause} Start with: ${diagnosis.checks[0]}.`,
     citations,
-    proposedNext: [
-      { label: 'Heater measured 22 ohms (in spec)', action: 'report-measurement:heating element:22' },
-      { label: 'Heater open circuit (0 ohms)', action: 'report-measurement:heating element:0' },
-      { label: 'Show me the replacement video', action: 'find-video' },
-    ],
+    proposedNext: proposedNext.slice(0, 4),
     confidence: conf.value, confidenceReason: conf.reason, status: 'ok',
     diagnosis, parts: [part], safety,
   };

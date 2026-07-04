@@ -63,7 +63,7 @@ export class VultrDriver implements ModelDriver {
 
   async plan(q: { device: string; symptom: string; hasPhoto: boolean; userInput?: string }): Promise<PlanAction> {
     const text = await chatText(this.t, MODELS.kimi,
-      `You are a repair agent planning evidence retrieval from service manuals.\nDevice: ${q.device}\nSymptom: ${q.symptom}\nUser input: ${q.userInput ?? 'none'}\nReturn STRICT JSON: {"goal": string, "queries": [string]} - one focused retrieval query (error code table / troubleshooting first). The retrieval query MUST be written in English (the corpus language) regardless of the user's language; write the goal in ${AGENT_LANG}.`, 600);
+      `You are a repair agent planning evidence retrieval from service manuals.\nDevice: ${q.device}\nSymptom: ${q.symptom}\nUser input: ${q.userInput ?? 'none'}\nReturn STRICT JSON: {"goal": string, "queries": [string]} - one focused retrieval query (error code table / troubleshooting first). The retrieval query MUST be written in English (the corpus language) regardless of the user's language; write the goal in ${AGENT_LANG}.`, 2400);
     return extractJson<PlanAction>(text, { goal: `Diagnose ${q.symptom}`, queries: [`${q.device} ${q.symptom}`] });
   }
 
@@ -99,23 +99,23 @@ export class VultrDriver implements ModelDriver {
   async assessSufficiency(q: { device: string; symptom: string }, found: ScoredPage[]): Promise<SufficiencyVerdict> {
     const listing = found.map((f) => `p.${f.page.page} kind=${f.page.kind} score=${f.score.toFixed(1)}${f.page.text ? ` text="${f.page.text.slice(0, 100)}"` : ''}`).join('\n');
     const text = await chatText(this.t, MODELS.kimi,
-      `Repair diagnosis for ${q.device} - ${q.symptom}. Evidence so far:\n${listing}\nTo point at a component you need BOTH the fault identification AND the wiring/schematic page. Return STRICT JSON: {"sufficient": boolean, "reason": string, "followupQuery": string|null}`, 600);
+      `Repair diagnosis for ${q.device} - ${q.symptom}. Evidence so far:\n${listing}\nTo point at a component you need BOTH the fault identification AND the wiring/schematic page. Return STRICT JSON: {"sufficient": boolean, "reason": string, "followupQuery": string|null}`, 2400);
     const v = extractJson(text, { sufficient: true, reason: 'assessment unavailable', followupQuery: null as string | null });
     return { sufficient: v.sufficient, reason: v.reason, followupQuery: v.followupQuery ?? undefined };
   }
 
   async diagnose(q: { device: string; symptom: string }, evidence: Page[], techPhoto?: string): Promise<Diagnosis> {
-    const parts: unknown[] = [{ type: 'text', text: `You are a repair diagnosis agent. Device: ${q.device}. Symptom: ${q.symptom}.\nGround yourself ONLY in the attached manual pages${techPhoto ? ' and the technician photo (last image)' : ''}. Return STRICT JSON: {"component": string, "cause": string, "checks": [string, string, string]} - checks ordered, concrete, with measurable values when the pages give them. Write component/cause/checks in ${AGENT_LANG}; keep part numbers and error codes verbatim. If the pages do not support a diagnosis, set component to "insufficient evidence". Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.` }];
+    const parts: unknown[] = [{ type: 'text', text: `You are a repair diagnosis agent. Device: ${q.device}. Symptom: ${q.symptom}.\nGround yourself ONLY in the attached manual pages${techPhoto ? ' and the technician photo (last image)' : ''}. Return STRICT JSON: {"component": string, "cause": string, "checks": [string, string, string]} - checks must be concrete ACTIONS the technician performs (measure X, inspect Y), ordered, with measurable values when the pages give them. Write component/cause/checks in ${AGENT_LANG}; keep part numbers and error codes verbatim. If the pages do not support a diagnosis, set component to "insufficient evidence". Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.` }];
     for (const p of evidence.slice(0, 4)) parts.push({ type: 'image_url', image_url: { url: await toDataUrl(p.imageUrl) } });
     if (techPhoto) parts.push({ type: 'image_url', image_url: { url: techPhoto } });
-    const text = await chatText(this.t, MODELS.omni, parts, 2000);
+    const text = await chatText(this.t, MODELS.omni, parts, 8000);
     return extractJson<Diagnosis>(text, { component: 'insufficient evidence', cause: 'Model response unparseable', checks: ['Retry the diagnosis'] });
   }
 
   async classify(input: ClassifyInput): Promise<DocMeta> {
     const parts: unknown[] = [{ type: 'text', text: `Classify this repair document (filename: ${input.filename}). First pages attached. Return STRICT JSON: {"category": string (lowercase generic device type, e.g. "dishwasher"), "brand": string, "model": string, "docType": "service"|"user"|"schematic"|"parts", "pageKinds": []} Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.` }];
     for (const img of input.pageImages.slice(0, 3)) parts.push({ type: 'image_url', image_url: { url: img } });
-    const text = await chatText(this.t, MODELS.omni, parts, 1200);
+    const text = await chatText(this.t, MODELS.omni, parts, 6000);
     const meta = extractJson<DocMeta>(text, { category: 'uncategorized', brand: 'Unknown', model: 'Unknown', docType: 'user', pageKinds: [] });
     meta.pageKinds = input.pageImages.map(() => 'other');
     return meta;
