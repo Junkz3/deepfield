@@ -2,7 +2,10 @@
 // apply manifest metadata (kinds), emit public/corpus/docs.json + taxonomy.json.
 // Usage: npm run ingest            (all docs)
 //        npm run ingest -- whirlpool-w11187658   (one doc)
-import { execFileSync } from 'node:child_process';
+import { execFile as execFileCb, execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFile = promisify(execFileCb);
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildTaxonomy } from '../src/agent/taxonomy';
@@ -19,10 +22,10 @@ const only = process.argv[2];
 
 /** Pixel-true text layout from the PDF text layer: words -> lines -> blocks.
  *  Powers in-place translation without any vision call for positioning. */
-function extractTextBlocks(pdf: string, pageNum: number): TextBlock[] {
+async function extractTextBlocks(pdf: string, pageNum: number): Promise<TextBlock[]> {
   let xml = '';
   try {
-    xml = execFileSync('pdftotext', ['-bbox', '-f', String(pageNum), '-l', String(pageNum), pdf, '-'], { encoding: 'utf8' });
+    xml = (await execFile('pdftotext', ['-bbox', '-f', String(pageNum), '-l', String(pageNum), pdf, '-'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })).stdout;
   } catch { return []; }
   const pageM = /<page width="([\d.]+)" height="([\d.]+)">/.exec(xml);
   if (!pageM) return [];
@@ -92,24 +95,35 @@ for (const m of manifest.docs) {
   const pages = parseRanges(m.pages, pageCount).filter((p) => p <= pageCount);
   const dir = join(OUT, m.id);
   mkdirSync(dir, { recursive: true });
-  const docPages: Page[] = [];
-  for (const p of pages) {
-    const prefix = join(dir, `p${p}`);
-    if (!existsSync(`${prefix}.png`)) {
-      execFileSync('pdftoppm', ['-png', '-r', '120', '-f', String(p), '-l', String(p), '-singlefile', pdf, prefix]);
+  // Worker pool: page rendering is CPU-bound in poppler subprocesses, so a
+  // dozen in flight uses the whole machine instead of one core.
+  const CONCURRENCY = 12;
+  const docPages: Page[] = new Array(pages.length);
+  let next = 0;
+  let done = 0;
+  await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
+    while (true) {
+      const i = next++;
+      if (i >= pages.length) return;
+      const p = pages[i];
+      const prefix = join(dir, `p${p}`);
+      if (!existsSync(`${prefix}.png`)) {
+        await execFile('pdftoppm', ['-png', '-r', '120', '-f', String(p), '-l', String(p), '-singlefile', pdf, prefix]);
+      }
+      let text = '';
+      try { text = (await execFile('pdftotext', ['-f', String(p), '-l', String(p), pdf, '-'], { encoding: 'utf8' })).stdout.trim(); } catch {}
+      const textBlocks = await extractTextBlocks(pdf, p);
+      docPages[i] = {
+        docId: m.id, page: p, imageUrl: `/corpus/${m.id}/p${p}.png`,
+        text: text.slice(0, 600) || undefined,
+        kind: m.kinds[String(p)] ?? 'other',
+        region: m.regions?.[String(p)],
+        textBlocks: textBlocks.length > 0 ? textBlocks : undefined,
+      };
+      done++;
+      if (done % 20 === 0 || done === pages.length) process.stdout.write(`\r${m.id}: ${done}/${pages.length}   `);
     }
-    let text = '';
-    try { text = execFileSync('pdftotext', ['-f', String(p), '-l', String(p), pdf, '-'], { encoding: 'utf8' }).trim(); } catch {}
-    const textBlocks = extractTextBlocks(pdf, p);
-    docPages.push({
-      docId: m.id, page: p, imageUrl: `/corpus/${m.id}/p${p}.png`,
-      text: text.slice(0, 600) || undefined,
-      kind: m.kinds[String(p)] ?? 'other',
-      region: m.regions?.[String(p)],
-      textBlocks: textBlocks.length > 0 ? textBlocks : undefined,
-    });
-    process.stdout.write(`\r${m.id}: p${p}/${pages[pages.length - 1]}   `);
-  }
+  }));
   console.log();
   docs.push({ id: m.id, filename: m.file, format: 'pdf', category: m.category, brand: m.brand, model: m.model, docType: m.docType, pages: docPages, sourceRights: m.sourceRights, origin: 'corpus' });
 }
