@@ -28,28 +28,52 @@ export async function translatePage(
   const hit = cache.get(key);
   if (hit) return hit;
 
-  let out: string;
   if (driverKind === 'fake') {
     await new Promise((r) => setTimeout(r, 1200));
-    out = `[offline preview] This page would be read by Nemotron and rendered in ${langName(lang)}, structure preserved, part numbers kept verbatim. Switch to the live driver for real translation.`;
-  } else {
-    const t = proxyTransport();
-    const r = await t('/chat/completions', {
-      model: MODELS.omni,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: `Read this manual page and render its full content in ${langName(lang)}. Preserve the structure with short markdown headings and lists. Keep part numbers, error codes, units and connector names EXACTLY as printed. If a region is a diagram, describe it in one line in ${langName(lang)}. Do not deliberate: keep any internal reasoning under 50 words, then output ONLY the translated content.`,
-          },
-          { type: 'image_url', image_url: { url: await toDataUrl(imageUrl) } },
-        ],
-      }],
-      max_tokens: 2400,
-    });
-    out = r.choices?.[0]?.message?.content?.trim() || 'Translation unavailable.';
+    const out = `[offline preview] This page would be read and rendered in ${langName(lang)}, structure preserved, part numbers kept verbatim. Switch to the live driver for real translation.`;
+    cache.set(key, out);
+    return out;
   }
+
+  const t = proxyTransport();
+  const r = await t('/chat/completions', {
+    model: MODELS.omni,
+    messages: [{
+      role: 'user',
+      content: [
+        {
+          type: 'text',
+          text: `Read this manual page and render its full content in ${langName(lang)}. Preserve the structure with short markdown headings and lists. Keep part numbers, error codes, units and connector names EXACTLY as printed. If a region is a diagram, describe it in one line in ${langName(lang)}. This is mechanical transcription work: keep any internal reasoning under 40 words, then output the translated content immediately.`,
+        },
+        { type: 'image_url', image_url: { url: await toDataUrl(imageUrl) } },
+      ],
+    }],
+    max_tokens: 4000,
+  });
+  const out = r.choices?.[0]?.message?.content?.trim() ?? '';
+  if (!out) {
+    // Reasoning burned the budget: do NOT cache the failure.
+    return 'The vision model ran out of budget on this dense page. Try again, or use a page with a text layer.';
+  }
+  cache.set(key, out);
+  return out;
+}
+
+/** Text-layer pages do not need vision at all: join the exact block texts and
+ *  let Kimi translate them - fast and reliable. */
+export async function translateTextLayer(
+  docId: string,
+  page: number,
+  blocks: { text: string }[],
+  lang: Lang,
+  driverKind: 'fake' | 'vultr',
+): Promise<string> {
+  const key = `pane-text/${docId}/${page}/${lang}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const lines = blocks.map((b) => b.text);
+  const translated = await translateLines(`pane-lines/${docId}/${page}`, lines, lang, driverKind);
+  const out = translated.join('\n\n');
   cache.set(key, out);
   return out;
 }

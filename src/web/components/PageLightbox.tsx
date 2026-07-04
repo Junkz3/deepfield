@@ -5,7 +5,7 @@
 // the technician's language - works on scans, tables and diagrams alike.
 import { useEffect, useRef, useState } from 'react';
 import { langName, useApp } from '../store';
-import { translateLines, translatePage } from '../translate';
+import { translateLines, translatePage, translateTextLayer } from '../translate';
 import type { TextBlock } from '../../agent/types';
 
 export function PageLightbox() {
@@ -72,8 +72,11 @@ export function PageLightbox() {
         );
         setBlocks(page.textBlocks.map((b, i) => ({ ...b, text: translated[i] ?? b.text })));
         setShowTranslated(true);
+      } else if (page.textBlocks && page.textBlocks.length > 0) {
+        // Dense layout, but a text layer exists: reliable text-only pane via Kimi.
+        setTranslation(await translateTextLayer(doc.id, page.page, page.textBlocks, state.lang, state.driverKind));
       } else {
-        // Scans have no text layer: honest side-pane fallback via Nemotron read.
+        // True scans only: Nemotron reads the image (retry allowed, failures not cached).
         setTranslation(await translatePage(doc.id, page.page, page.imageUrl, state.lang, state.driverKind));
       }
     } catch (e) {
