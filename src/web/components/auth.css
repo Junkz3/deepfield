@@ -1,0 +1,101 @@
+/* Account gate: same control-room language as the Studio, empty space
+   until you are let in. */
+.auth-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse 70% 90% at 50% 45%, #0b0f14 0%, #07090c 100%);
+}
+
+.auth-card {
+  width: min(380px, calc(100vw - var(--sp-6)));
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-6);
+}
+
+.auth-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--accent), transparent 70%);
+  border: 1px solid var(--line-strong);
+  margin-bottom: var(--sp-2);
+}
+
+.auth-title { font-size: var(--fs-xl); margin: 0; }
+.auth-tagline { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 var(--sp-3); }
+
+.auth-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.auth-input {
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--fg0);
+  padding: 9px 12px;
+  font-size: var(--fs-sm);
+  margin-bottom: var(--sp-2);
+}
+.auth-input:focus { outline: none; border-color: var(--accent); }
+
+.auth-error {
+  color: var(--err);
+  font-size: var(--fs-xs);
+  padding: 6px 0;
+}
+
+.auth-submit { margin-top: var(--sp-2); }
+
+.auth-switch {
+  margin-top: var(--sp-2);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.04em;
+}
+.auth-switch:hover { color: var(--accent); }
+
+.auth-note {
+  margin: var(--sp-3) 0 0;
+  color: var(--text-faint);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.auth-checking {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-dim);
+}
+
+/* Signed-in chip: account and daily budget, bottom right, out of the way. */
+.auth-chip {
+  position: fixed;
+  right: var(--sp-3);
+  bottom: var(--sp-3);
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg1) 82%, transparent);
+  backdrop-filter: blur(8px);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+.auth-chip-quota { color: var(--accent); }
+.auth-chip-out { color: var(--text-faint); }
+.auth-chip-out:hover { color: var(--err); }
