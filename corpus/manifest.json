@@ -1,0 +1,105 @@
+{
+  "docs": [
+    {
+      "id": "whirlpool-w11187658",
+      "file": "whirlpool-w11187658.pdf",
+      "pages": "1-64",
+      "category": "dishwasher",
+      "brand": "Whirlpool",
+      "model": "W11187658",
+      "docType": "service",
+      "sourceRights": "Whirlpool official service manual (reference input)",
+      "kinds": {
+        "18": "error-table",
+        "19": "troubleshooting", "20": "troubleshooting", "21": "troubleshooting",
+        "22": "troubleshooting", "23": "troubleshooting", "24": "troubleshooting",
+        "25": "schematic", "26": "schematic", "27": "schematic", "28": "schematic",
+        "4": "safety",
+        "40": "procedure", "41": "procedure", "42": "procedure", "43": "procedure",
+        "44": "procedure", "45": "procedure", "46": "procedure", "47": "procedure",
+        "48": "procedure", "49": "procedure", "50": "procedure"
+      }
+    },
+    {
+      "id": "hmmwv-tm-9-2320-387-24-1",
+      "file": "hmmwv-tm-9-2320-387-24-1.pdf",
+      "pages": "155-160,535-545,1661-1700",
+      "category": "vehicle",
+      "brand": "AM General",
+      "model": "M1151 HMMWV",
+      "docType": "service",
+      "sourceRights": "US Government work, public domain (Distribution Statement A)",
+      "kinds": {
+        "155": "troubleshooting", "156": "troubleshooting", "157": "troubleshooting",
+        "158": "troubleshooting", "159": "troubleshooting", "160": "troubleshooting",
+        "535": "troubleshooting", "536": "troubleshooting", "537": "troubleshooting",
+        "538": "error-table", "539": "error-table", "540": "error-table",
+        "541": "error-table", "542": "error-table", "543": "error-table",
+        "544": "error-table", "545": "error-table",
+        "1661": "schematic", "1663": "schematic", "1665": "schematic", "1667": "schematic",
+        "1669": "schematic", "1671": "schematic", "1673": "schematic", "1675": "schematic",
+        "1677": "schematic", "1679": "schematic", "1681": "schematic", "1683": "schematic",
+        "1685": "schematic", "1687": "schematic", "1689": "schematic", "1691": "schematic",
+        "1693": "schematic", "1695": "schematic", "1697": "schematic", "1699": "schematic"
+      }
+    },
+    {
+      "id": "ifixit-iphone-se-battery",
+      "file": "ifixit-iphone-se-battery.pdf",
+      "pages": "all",
+      "category": "smartphone",
+      "brand": "Apple",
+      "model": "iPhone SE 2020",
+      "docType": "service",
+      "sourceRights": "iFixit, CC BY-NC-SA 3.0",
+      "kinds": {}
+    },
+    {
+      "id": "ifixit-joycon",
+      "file": "ifixit-joycon.pdf",
+      "pages": "all",
+      "category": "game console",
+      "brand": "Nintendo",
+      "model": "Switch Joy-Con",
+      "docType": "service",
+      "sourceRights": "iFixit, CC BY-NC-SA 3.0",
+      "kinds": {}
+    },
+    {
+      "id": "ifixit-keurig-pump",
+      "file": "ifixit-keurig-pump.pdf",
+      "pages": "all",
+      "category": "coffee machine",
+      "brand": "Keurig",
+      "model": "K-Duo",
+      "docType": "service",
+      "sourceRights": "iFixit, CC BY-NC-SA 3.0",
+      "kinds": {}
+    },
+    {
+      "id": "lg-washer",
+      "file": "lg-washer.pdf",
+      "pages": "1-40",
+      "category": "washing machine",
+      "brand": "LG",
+      "model": "F4WV5",
+      "docType": "service",
+      "sourceRights": "LG official service manual (reference input)",
+      "kinds": {}
+    },
+    {
+      "id": "delonghi-ec9355",
+      "file": "delonghi-ec9355.pdf",
+      "pages": "all",
+      "category": "coffee machine",
+      "brand": "DeLonghi",
+      "model": "EC9355",
+      "docType": "service",
+      "sourceRights": "DeLonghi official service manual (reference input)",
+      "kinds": {
+        "5": "schematic",
+        "21": "troubleshooting", "22": "troubleshooting", "23": "troubleshooting", "24": "troubleshooting"
+      }
+    }
+  ]
+}
