@@ -20,6 +20,10 @@ export interface AppState {
   highlight: { docId: string; page: number }[];
   scanning: boolean;
   lightbox: { docId: string; page: number } | null;
+  /** live ingestion feedback: the embryo card near the core */
+  ingesting: { name: string } | null;
+  /** the doc that was just classified: its card flies from the core */
+  lastBorn: string | null;
 }
 
 export type Action =
@@ -34,6 +38,8 @@ export type Action =
   | { type: 'set-driver'; kind: DriverKind }
   | { type: 'open-lightbox'; docId: string; page: number }
   | { type: 'close-lightbox' }
+  | { type: 'ingest-start'; name: string }
+  | { type: 'ingest-done'; docId: string | null }
   | { type: 'demo-reset' };
 
 const LS_KEY = 'rc.conversations';
@@ -62,6 +68,8 @@ export const initialState: AppState = {
   highlight: [],
   scanning: false,
   lightbox: null,
+  ingesting: null,
+  lastBorn: null,
 };
 
 export function reducer(state: AppState, a: Action): AppState {
@@ -98,6 +106,10 @@ export function reducer(state: AppState, a: Action): AppState {
       return { ...state, lightbox: { docId: a.docId, page: a.page } };
     case 'close-lightbox':
       return { ...state, lightbox: null };
+    case 'ingest-start':
+      return { ...state, ingesting: { name: a.name } };
+    case 'ingest-done':
+      return { ...state, ingesting: null, lastBorn: a.docId };
     case 'demo-reset':
       localStorage.removeItem(LS_KEY);
       return {
@@ -108,6 +120,8 @@ export function reducer(state: AppState, a: Action): AppState {
         highlight: [],
         scanning: false,
         lightbox: null,
+        ingesting: null,
+        lastBorn: null,
       };
     default:
       return state;

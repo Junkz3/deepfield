@@ -64,8 +64,25 @@ export class VultrDriver implements ModelDriver {
   }
 
   async retrieve(query: string, candidates: Page[]): Promise<ScoredPage[]> {
+    // Two-stage retrieval: a fast lexical prefilter narrows the taxonomy scope
+    // to a visual-rerank budget (base64 page images are heavy on the wire),
+    // then VultronRetriever scores the actual page IMAGES against the query.
+    const BUDGET = 24;
+    const terms = query.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+    const lex = (p: Page): number => {
+      let sc = 0;
+      const hay = `${p.text ?? ''} ${p.title ?? ''} ${p.kind}`.toLowerCase();
+      for (const w of terms) if (hay.includes(w)) sc += 1;
+      if (p.kind !== 'other') sc += 0.5; // curated key pages float up
+      return sc;
+    };
+    const budget = [...candidates]
+      .map((p, i) => ({ p, i, sc: lex(p) }))
+      .sort((a, b) => b.sc - a.sc || a.i - b.i)
+      .slice(0, BUDGET)
+      .map((x) => x.p);
+
     // VERIFIED shape (docs/reference/vultr-api.md): documents = list of str | {content:[ONE part]}; top_n MUST be set.
-    const budget = candidates.slice(0, 200); // ~900 tok/page, stay under ctx
     const documents = await Promise.all(budget.map(async (p) =>
       p.imageUrl ? { content: [{ type: 'image_url', image_url: { url: await toDataUrl(p.imageUrl) } }] } : (p.text ?? ''),
     ));

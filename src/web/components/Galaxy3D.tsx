@@ -245,6 +245,34 @@ function ScanStorm({ targets }: { targets: { pos: THREE.Vector3; color: string }
   );
 }
 
+/** A raw file materializing near the core while the agent reads it:
+ *  a white holographic embryo card, struck by analysis lightning. */
+const EMBRYO_POS = new THREE.Vector3(0.85, 0.42, 0.55);
+
+function IngestEmbryo() {
+  const mesh = useRef<THREE.Mesh>(null);
+  const holo = fileCardTexture('#ffd9a0');
+  useFrame(({ clock }) => {
+    if (!mesh.current) return;
+    const t = clock.elapsedTime;
+    mesh.current.scale.setScalar(1 + Math.sin(t * 6) * 0.06);
+    (mesh.current.material as THREE.MeshBasicMaterial).opacity = 0.75 + Math.sin(t * 9) * 0.2;
+  });
+  return (
+    <group position={EMBRYO_POS}>
+      <Billboard>
+        <mesh ref={mesh}>
+          <planeGeometry args={[0.34, 0.425]} />
+          <meshBasicMaterial map={holo} transparent depthWrite={false} color="#ffffff" blending={THREE.AdditiveBlending} />
+        </mesh>
+        <Text font={displayFont} position={[0, -0.32, 0]} fontSize={0.075} color="#ffc678" anchorX="center" letterSpacing={0.2} outlineWidth={0.004} outlineColor="#080b10">
+          ANALYZING
+        </Text>
+      </Billboard>
+    </group>
+  );
+}
+
 /* ---------- the agent core ---------- */
 
 function AgentCore({ scanning }: { scanning: boolean }) {
@@ -354,10 +382,11 @@ interface FileNode {
   sparks: [number, number, number][];
 }
 
-function FileCard({ node, targetPos, ghost, isHit, hitCount, onHover, onSelect }: {
+function FileCard({ node, targetPos, ghost, bornAtCore, isHit, hitCount, onHover, onSelect }: {
   node: FileNode;
   targetPos: THREE.Vector3;
   ghost: boolean;
+  bornAtCore: boolean;
   isHit: boolean;
   hitCount: number;
   onHover: (h: { doc: Document; x: number; y: number } | null) => void;
@@ -397,7 +426,7 @@ function FileCard({ node, targetPos, ghost, isHit, hitCount, onHover, onSelect }
   const dims: [number, number] = isVideo ? [0.38 * k, 0.285 * k] : [0.3 * k, 0.39 * k];
 
   return (
-    <group ref={root} position={node.pos}>
+    <group ref={root} position={bornAtCore ? EMBRYO_POS : node.pos}>
       <Billboard>
         {/* category-tinted frame behind the real cover */}
         {cover && (
@@ -685,6 +714,7 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
             node={n}
             targetPos={livePos(n)}
             ghost={!inScope(n.doc.id)}
+            bornAtCore={state.lastBorn === n.doc.id}
             isHit={hitByDoc.has(n.doc.id)}
             hitCount={(hitByDoc.get(n.doc.id) ?? []).length}
             onHover={onHover}
@@ -695,6 +725,14 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
 
       {state.scanning && (
         <ScanStorm targets={nodes.filter((n) => inScope(n.doc.id)).map((n) => ({ pos: livePos(n), color: n.color }))} />
+      )}
+
+      {state.ingesting && (
+        <group>
+          <IngestEmbryo />
+          <LightningBolt to={EMBRYO_POS} color="#ffd9a0" interval={0.05} />
+          <LightningBolt to={EMBRYO_POS} color="#59c2ff" interval={0.09} />
+        </group>
       )}
 
       {focusNode && floatingPages.map((p, i) => (

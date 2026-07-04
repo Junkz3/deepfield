@@ -26,12 +26,15 @@ function Shell() {
     const driver = await getDriver(state.driverKind);
     for (const file of files) {
       setIngesting(`Reading and classifying "${file.name}"…`);
+      dispatch({ type: 'ingest-start', name: file.name });
       try {
         const doc = await ingestFile(file, driver);
         dispatch({ type: 'add-session-doc', doc });
+        dispatch({ type: 'ingest-done', docId: doc.id });
         setIngesting(`Filed under ${doc.category} / ${doc.brand} ${doc.model}`);
         setTimeout(() => setIngesting(null), 2600);
       } catch (err) {
+        dispatch({ type: 'ingest-done', docId: null });
         setIngesting(`Could not ingest ${file.name}: ${err instanceof Error ? err.message : 'unknown error'}`);
         setTimeout(() => setIngesting(null), 4000);
       }
