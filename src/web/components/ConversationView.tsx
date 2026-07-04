@@ -8,6 +8,9 @@ import { Timeline } from './Timeline';
 import { WorkOrderView } from './WorkOrderView';
 import './conversation.css';
 
+const isAction = (t: string) =>
+  /^(report-measurement:|find-video$|order-part:|show-citation:|compile-work-order$|open-ingest$)/.test(t);
+
 function ConfidenceMeter({ value, reason }: { value: number; reason: string }) {
   const color = value >= 0.7 ? 'var(--ok)' : value >= 0.4 ? 'var(--warn)' : 'var(--err)';
   return (
@@ -134,14 +137,21 @@ export function ConversationView({ id }: { id: string }) {
 
       <div className="conv-stream" ref={streamRef}>
         {conv.steps.map((s, i) => (
-          <StepCard
-            key={s.index}
-            step={s}
-            isLast={i === conv.steps.length - 1 && !live.running}
-            onAction={onAction}
-            onOpenCite={openCite}
-          />
+          <div key={s.index} className="step-group">
+            {s.userInput && !isAction(s.userInput) && (
+              <div className="user-bubble fade-up">{s.userInput}</div>
+            )}
+            <StepCard
+              step={s}
+              isLast={i === conv.steps.length - 1 && !live.running}
+              onAction={onAction}
+              onOpenCite={openCite}
+            />
+          </div>
         ))}
+        {live.running && live.userInput && !isAction(live.userInput) && (
+          <div className="user-bubble fade-up">{live.userInput}</div>
+        )}
         {live.running && (
           <article className="step-card panel live">
             <header className="step-head">
@@ -156,9 +166,36 @@ export function ConversationView({ id }: { id: string }) {
         )}
       </div>
 
+      <FreeReply disabled={live.running} onSend={(text) => void run(text)} />
+
       {showWorkOrder && (
         <WorkOrderView conversation={conv} docs={docs} onClose={() => setShowWorkOrder(false)} />
       )}
     </section>
+  );
+}
+
+function FreeReply({ disabled, onSend }: { disabled: boolean; onSend: (text: string) => void }) {
+  const [text, setText] = useState('');
+  const submit = () => {
+    if (!text.trim() || disabled) return;
+    onSend(text.trim());
+    setText('');
+  };
+  return (
+    <div className="conv-reply">
+      <input
+        placeholder={disabled ? 'The agent is working…' : 'Answer the agent or ask anything about this repair…'}
+        value={text}
+        disabled={disabled}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && submit()}
+      />
+      <button className="btn" onClick={submit} disabled={disabled || !text.trim()} title="Send">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+      </button>
+    </div>
   );
 }

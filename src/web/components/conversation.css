@@ -653,3 +653,33 @@
   box-shadow: 0 0 0 2px rgba(252, 252, 250, 0.96);
   font-family: var(--font-ui);
 }
+
+/* ---- Free-form dialogue ---- */
+
+.step-group { display: flex; flex-direction: column; gap: var(--sp-3); }
+
+.user-bubble {
+  align-self: flex-end;
+  max-width: 82%;
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: 14px 14px 4px 14px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(255, 180, 84, 0.35);
+  color: var(--accent-strong);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+.conv-reply {
+  display: flex;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+.conv-reply input {
+  flex: 1;
+  background: rgba(11, 15, 20, 0.5);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.conv-reply input:disabled { opacity: 0.5; }

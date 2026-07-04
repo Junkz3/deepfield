@@ -10,6 +10,7 @@ export interface LiveStep {
   events: PhaseEvent[];
   running: boolean;
   currentPhase?: Phase;
+  userInput?: string;
 }
 
 export function useStepRunner(conversationId: string) {
@@ -23,18 +24,18 @@ export function useStepRunner(conversationId: string) {
       const conv = state.conversations.find((c) => c.id === conversationId);
       if (!conv) return;
       runningRef.current = true;
-      setLive({ events: [], running: true });
+      setLive({ events: [], running: true, userInput });
       try {
         const driver = await getDriver(state.driverKind);
         const gen = runStep({ conversation: conv, docs, userInput }, driver);
         while (true) {
           const n = await gen.next();
           if (n.done) {
-            dispatch({ type: 'append-step', conversationId, step: n.value });
+            dispatch({ type: 'append-step', conversationId, step: { ...n.value, userInput } });
             break;
           }
           const e = n.value;
-          setLive((prev) => ({ events: [...prev.events, e], running: true, currentPhase: e.phase }));
+          setLive((prev) => ({ ...prev, events: [...prev.events, e], running: true, currentPhase: e.phase }));
           if (e.phase === 'retrieve') {
             if (e.hitPages) {
               dispatch({ type: 'set-scanning', scanning: false });
