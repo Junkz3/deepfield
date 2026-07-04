@@ -218,3 +218,19 @@
 }
 .sidebar-item.dormant { opacity: 0.6; }
 .sidebar-item.dormant:hover { opacity: 1; }
+
+/* The glyph ring: both doc-planets orbit the agent sun, one slow lap. */
+.galaxy-glyph-ring {
+  animation: galaxy-orbit 16s linear infinite;
+  transform-origin: center;
+  transform-box: view-box;
+}
+
+@keyframes galaxy-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .galaxy-glyph-ring { animation: none; }
+}

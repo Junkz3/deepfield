@@ -75,6 +75,27 @@ export function candidatePages(docs: Document[], deviceQuery: string): Page[] {
   return docs.filter((d) => ids.has(d.id)).flatMap((d) => d.pages);
 }
 
+/** The workspace's own inventory, as text: what "what can you help with?"
+ *  is answered from. Deterministic - the taxonomy IS the answer, the model
+ *  only phrases it in the user's language. */
+export function scopeSummary(docs: Document[]): string {
+  const byCat = new Map<string, Document[]>();
+  for (const d of docs) {
+    const list = byCat.get(d.category) ?? [];
+    list.push(d);
+    byCat.set(d.category, list);
+  }
+  const totalPages = docs.reduce((n, d) => n + d.pages.length, 0);
+  const lines = [...byCat.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([cat, ds]) =>
+      `- ${cat}: ${ds.map((d) => `${d.brand} ${d.model} (${d.docType} manual, ${d.pages.length} pages)`).join('; ')}`);
+  return [
+    `This workspace indexes ${docs.length} document(s) across ${byCat.size} device categor${byCat.size > 1 ? 'ies' : 'y'} (${totalPages} pages total):`,
+    ...lines,
+  ].join('\n');
+}
+
 /** Cheap text-side prefilter before the visual rerank. The reranker reads
  *  page IMAGES (~900 tokens each), so a 90-page pool costs 20-40s per round;
  *  token overlap plus kind boosts keep the pool tight with zero extra calls.

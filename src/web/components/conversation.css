@@ -870,13 +870,6 @@
 }
 .step-verdict-reads { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
 
-/* Nova rides the live reasoning step only; finished steps stay untouched. */
-.step-head-left {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
 /* Offline-script banner: impossible to mistake a scripted demo for live. */
 .conv-offline {
   margin: var(--sp-2) var(--sp-4) 0;

@@ -98,7 +98,7 @@ export class VultrDriver implements ModelDriver {
       : '{"goal": string, "queries": [string], "intent": "diagnose"|"question"}';
     const hint = routed ? "follow the routed agent's evidence focus" : workflowProfile().retrievalHint;
     const text = await chatText(this.t, MODELS.omni,
-      `You are ${role} planning evidence retrieval from a knowledge base that holds PAGINATED DOCUMENT PAGES and TIMESTAMPED VIDEO WALKTHROUGH SEGMENTS.\n${workflowProfile().subjectNoun}: ${q.device}\n${workflowProfile().issueNoun}: ${q.symptom}\nUser input: ${userInput ?? 'none'}${roster}\nThis is quick planning, not analysis: keep any internal reasoning under 30 words. Return STRICT JSON: ${jsonShape} - intent is "diagnose" for faults/symptoms to troubleshoot, "question" for how-to, maintenance, specs or informational asks; one focused retrieval query (${hint}; start the query with "video walkthrough" when the user wants a demonstration). The retrieval query MUST be written in English (the corpus language) regardless of the user's language; write the goal in ${AGENT_LANG}.`, 8000);
+      `You are ${role} planning evidence retrieval from a knowledge base that holds PAGINATED DOCUMENT PAGES and TIMESTAMPED VIDEO WALKTHROUGH SEGMENTS.\n${workflowProfile().subjectNoun}: ${q.device}\n${workflowProfile().issueNoun}: ${q.symptom}\nUser input: ${userInput ?? 'none'}${roster}\nThis is quick planning, not analysis: keep any internal reasoning under 30 words. Return STRICT JSON: ${jsonShape} - intent is "diagnose" for faults/symptoms to troubleshoot, "question" for how-to, maintenance, specs or informational asks, "scope" when the user asks what this workspace or assistant covers, supports or can help with; one focused retrieval query (${hint}; start the query with "video walkthrough" when the user wants a demonstration). The retrieval query MUST be written in English (the corpus language) regardless of the user's language; write the goal in ${AGENT_LANG}.`, 8000);
     return extractJson<PlanAction>(text, { goal: `Diagnose ${q.symptom}`, queries: [`${q.device} ${q.symptom}`] });
   }
 
@@ -111,7 +111,12 @@ export class VultrDriver implements ModelDriver {
     const parts: unknown[] = [{ type: 'text', text: `You are a technical assistant answering from the attached manual pages ONLY. Question: ${question}
 Attached pages, in this order: ${pageList}.
 ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque values EXACTLY as printed; cite pages by their REAL numbers from the list above, like (${shown[0] ? `p.${shown[0].page}` : 'p.12'}), after each fact. If the pages do not contain the answer, say exactly what is missing. Keep any internal reasoning under 60 words, then write the answer.` }];
-    for (const p of shown) parts.push({ type: 'image_url', image_url: { url: await toDataUrl(p.imageUrl) } });
+    for (const p of shown) {
+      // Synthetic text pages (workspace inventory for scope questions) ride
+      // as text blocks; real manual pages ride as images.
+      if (p.imageUrl) parts.push({ type: 'image_url', image_url: { url: await toDataUrl(p.imageUrl) } });
+      else parts.push({ type: 'text', text: `[p.${p.page}] ${p.text ?? ''}` });
+    }
     // Same two-regime retry as diagnose: brevity directive first (rumination
     // burns the cap on sparse evidence), then shed pages (density burns it).
     for (const [i, take] of [4, 4, 2, 1].entries()) {

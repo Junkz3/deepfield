@@ -1,6 +1,6 @@
 import type { Conversation, Diagnosis, Document, GuidedStep, PartLine, PhaseEvent, SafetyInfo, ScoredPage, WorkOrder } from './types';
 import type { ModelDriver } from './driver';
-import { candidatePages, pageTitle, trimPool } from './taxonomy';
+import { candidatePages, pageTitle, scopeSummary, trimPool } from './taxonomy';
 import { activeTools } from './tools';
 import { computeConfidence, workOrderConfidence } from './confidence';
 import { activeAgents, setWorkflowProfile, workflowProfile } from './workflow';
@@ -38,6 +38,28 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     setWorkflowProfile(chosen.profile);
     agentLabel = chosen.label;
     if (team.length > 1) yield emit({ phase: 'plan', summary: `Routed to ${chosen.label}` });
+  }
+
+  // WORKSPACE-SCOPE questions ("what can you help me with?"): the answer is
+  // the workspace's own taxonomy, not any manual page. The inventory is
+  // deterministic; the model only phrases it in the user's language.
+  if (plan.intent === 'scope' && driver.answer) {
+    yield emit({ phase: 'reason', summary: 'Reading the workspace index itself' });
+    const inventory = scopeSummary(docs);
+    const inventoryPage = { docId: 'workspace-index', page: 1, imageUrl: '', text: inventory, kind: 'other' as const };
+    const text = await driver.answer(
+      userInput && userInput.trim().length > 0 ? userInput : `${conversation.device}: ${conversation.symptom}`,
+      [inventoryPage], 'qa',
+    );
+    yield emit({ phase: 'decide', summary: 'Answered from the workspace index' });
+    return {
+      index: conversation.steps.length, phaseEvents: events, agentLabel,
+      instruction: text.split('\n')[0].slice(0, 200),
+      answer: text,
+      citations: [],
+      proposedNext: [],
+      confidence: 0.95, confidenceReason: 'answered from the workspace index itself', status: 'ok',
+    };
   }
 
   // A reported measurement is plain conversation: the technician types the

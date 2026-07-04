@@ -5,14 +5,17 @@ import { setWorkflowProfile } from '../../agent/workflow';
 import './sidebar.css';
 
 /** Galaxy glyph: the agent sun + two orbiting docs, pure SVG, no emoji.
- *  Doubles as the Deepfield logo (Studio header uses it enlarged). */
+ *  Doubles as the Deepfield logo (Studio header uses it enlarged); the docs
+ *  slowly orbit the sun (CSS spin on the ring group). */
 export function GalaxyGlyph({ size = 18 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 18 18" aria-hidden>
+    <svg className="galaxy-glyph" width={size} height={size} viewBox="0 0 18 18" aria-hidden>
       <circle cx="9" cy="9" r="2.6" fill="var(--accent)" />
       <circle cx="9" cy="9" r="6.4" fill="none" stroke="var(--line-strong)" strokeWidth="1" />
-      <circle cx="14.6" cy="6.2" r="1.4" fill="var(--info)" />
-      <circle cx="3.8" cy="12.4" r="1.1" fill="var(--cat-vehicle)" />
+      <g className="galaxy-glyph-ring">
+        <circle cx="14.6" cy="6.2" r="1.4" fill="var(--info)" />
+        <circle cx="3.8" cy="12.4" r="1.1" fill="var(--cat-vehicle)" />
+      </g>
     </svg>
   );
 }

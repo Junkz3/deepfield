@@ -5,7 +5,6 @@ import type { Citation, GuidedStep } from '../../agent/types';
 import { useStepRunner } from '../hooks/useStepRunner';
 import { useApp } from '../store';
 import { AgentDock } from './AgentDock';
-import { Mascot } from './Mascot';
 import { VoiceInput } from './VoiceInput';
 import { Timeline } from './Timeline';
 import { WorkOrderView } from './WorkOrderView';
@@ -255,10 +254,7 @@ export function ConversationView({ id }: { id: string }) {
         {live.running && (
           <article className="step-card panel live">
             <header className="step-head">
-              <span className="step-head-left">
-                <Mascot mood="thinking" size={28} />
-                <span className="step-index mono">STEP {conv.steps.length + 1}</span>
-              </span>
+              <span className="step-index mono">STEP {conv.steps.length + 1}</span>
               <span className="step-status mono live-chip">
                 <span className="live-dot" />
                 {state.driverKind === 'vultr' ? 'REASONING ON VULTR' : 'REASONING'}

@@ -133,3 +133,17 @@ describe('scopeDocIds (contextual recursion)', () => {
     expect(scopeDocIds(CORPUS, 'zzz unknown').size).toBe(3);
   });
 });
+
+describe('scopeSummary (the workspace knows itself)', () => {
+  it('inventories categories, brands, models and page counts', () => {
+    const docs = [
+      { id: 'a', category: 'dishwasher', brand: 'Whirlpool', model: 'W11', docType: 'service', pages: [{}, {}] },
+      { id: 'b', category: 'chainsaw', brand: 'Stihl', model: 'MS 250', docType: 'user', pages: [{}] },
+      { id: 'c', category: 'dishwasher', brand: 'Bosch', model: 'SMS', docType: 'user', pages: [{}] },
+    ] as unknown as Parameters<typeof scopeSummary>[0];
+    const s = scopeSummary(docs);
+    expect(s).toMatch(/3 document\(s\) across 2 device categories \(4 pages total\)/);
+    expect(s).toMatch(/dishwasher: Whirlpool W11 \(service manual, 2 pages\); Bosch SMS/);
+    expect(s).toMatch(/chainsaw: Stihl MS 250/);
+  });
+});
