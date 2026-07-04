@@ -1,9 +1,8 @@
 import type { Diagnosis, DocType, Page, PageKind, PlanAction, ScoredPage } from './types';
 import { E3_DIAGNOSIS, E3_FLIPPED_DIAGNOSIS, E3_PLAN, E3_SUFFICIENCY } from './fixtures/e3-case';
-import type { AgentSpec } from './workflow';
 import { activeAgents } from './workflow';
-import type { TeamCalibrationInput } from './team';
-import { heuristicTeam } from './team';
+import type { TeamCalibration, TeamCalibrationInput } from './team';
+import { heuristicCalibration } from './team';
 
 export interface ClassifyInput { filename: string; pageImages: string[]; pageTexts: (string | undefined)[] }
 export interface DocMeta { category: string; brand: string; model: string; docType: DocType; pageKinds: PageKind[] }
@@ -26,8 +25,9 @@ export interface ModelDriver {
    *  loop falls back to the diagnosis pipeline when a driver lacks it. */
   answer?(question: string, evidence: Page[], mode: 'qa' | 'deep'): Promise<string>;
   /** Team calibration: design 1-3 specialized agents for the corpus and the
-   *  user's intent - optional; callers fall back to the heuristic team. */
-  calibrateTeam?(input: TeamCalibrationInput): Promise<AgentSpec[]>;
+   *  user's intent, plus the workspace ops they may request - optional;
+   *  callers fall back to the heuristic calibration. */
+  calibrateTeam?(input: TeamCalibrationInput): Promise<TeamCalibration>;
   /** Tag freshly ingested pages with retrieval-boosting kinds (error-table,
    *  coverage-table, ...) from their text - optional, batched, background. */
   tagPages?(pages: { page: number; text?: string }[]): Promise<Record<number, PageKind>>;
@@ -122,9 +122,9 @@ export class FakeDriver implements ModelDriver {
       };
   }
 
-  async calibrateTeam(input: TeamCalibrationInput): Promise<AgentSpec[]> {
+  async calibrateTeam(input: TeamCalibrationInput): Promise<TeamCalibration> {
     await this.pace('assessSufficiency');
-    return heuristicTeam(input);
+    return heuristicCalibration(input);
   }
 
   async generateProbe(page: { page: number; text: string }): Promise<{ question: string; mustContain: string[] } | null> {

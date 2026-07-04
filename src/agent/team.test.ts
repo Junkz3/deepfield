@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { FakeDriver } from './driver';
 import { runStep } from './loop';
-import { heuristicTeam, parseTeam, presetTeam } from './team';
+import { heuristicCalibration, heuristicTeam, parseOps, parseTeam, parseTeamCalibration, presetTeam } from './team';
+import { TOOL_REGISTRY } from './tools';
 import type { Conversation, Document } from './types';
 import { setWorkflowProfile, setWorkflowTeam, workflowProfile } from './workflow';
 
@@ -69,6 +70,73 @@ describe('parseTeam', () => {
     expect(parseTeam('no json here')).toBeNull();
     expect(parseTeam('{"team": []}')).toBeNull();
     expect(parseTeam('{"team": [{"id": "x"}]}')).toBeNull();
+  });
+});
+
+describe('parseOps (model-written workspace operations)', () => {
+  const lookup = { id: 'coolant-spec', label: 'Coolant spec lookup', kind: 'lookup', query: 'coolant capacity table', cue: 'with args.system when fluids matter' };
+  const capture = { id: 'pressure', label: 'Pressure capture', kind: 'capture', cue: 'with args.point when a reading would decide' };
+
+  it('parses valid lookup and capture ops', () => {
+    const ops = parseOps(JSON.stringify({ ops: [lookup, capture] }));
+    expect(ops.map((o) => o.id)).toEqual(['coolant-spec', 'pressure']);
+    expect(ops[0].query).toBe('coolant capacity table');
+    expect(ops[1].query).toBeUndefined();
+  });
+
+  it('drops unknown kinds, lookups without a query, duplicates, and caps at 3', () => {
+    const ops = parseOps(JSON.stringify({
+      ops: [
+        { ...lookup, kind: 'execute' },
+        { ...lookup, query: undefined },
+        capture, capture,
+        { ...lookup, id: 'extra-1' }, { ...lookup, id: 'extra-2' },
+      ],
+    }));
+    // slice(0,3) first: execute(bad), no-query(bad), capture -> one survivor
+    expect(ops.map((o) => o.id)).toEqual(['pressure']);
+  });
+
+  it('returns [] on prose or a missing ops field', () => {
+    expect(parseOps('no json')).toEqual([]);
+    expect(parseOps('{"team": []}')).toEqual([]);
+  });
+
+  it('parseTeamCalibration drops ops when no agent diagnoses (no consumer)', () => {
+    const text = JSON.stringify({
+      team: [{
+        id: 'advisor', label: 'Advisor', charter: 'coverage questions', agentRole: 'an advisor',
+        subjectNoun: 'policy', issueNoun: 'question', retrievalHint: 'coverage tables first',
+        decisionMode: 'answer', physicalTools: false, classifyHint: 'category = policy type',
+      }],
+      ops: [lookup],
+    });
+    expect(parseTeamCalibration(text)!.ops).toEqual([]);
+  });
+
+  it('parseTeamCalibration materializes ops into runnable tools', () => {
+    const text = JSON.stringify({
+      team: [{
+        id: 'tech', label: 'Technician', charter: 'field diagnostics', agentRole: 'a technician',
+        subjectNoun: 'machine', issueNoun: 'fault', retrievalHint: 'procedures first',
+        decisionMode: 'diagnosis', physicalTools: true, classifyHint: 'category = machine type',
+      }],
+      ops: [lookup],
+    });
+    const c = parseTeamCalibration(text);
+    expect(c!.team[0].id).toBe('tech');
+    expect(c!.ops[0].id).toBe('coolant-spec');
+    expect(typeof c!.ops[0].run).toBe('function');
+  });
+});
+
+describe('heuristicCalibration', () => {
+  it('ships the hand-written registry for the repair vertical only', () => {
+    const repair = heuristicCalibration({ workspaceName: 'Shop', fileNames: ['service-manual.pdf'] });
+    expect(repair.ops).toBe(TOOL_REGISTRY);
+    const insurance = heuristicCalibration({ workspaceName: 'Desk', fileNames: ['policy-wording.pdf'] });
+    expect(insurance.team.map((a) => a.id)).toContain('claims-analyst');
+    expect(insurance.ops).toEqual([]);
   });
 });
 

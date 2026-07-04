@@ -6,6 +6,8 @@
 // module, so the keyword table lives here too.
 import type { AgentSpec, WorkflowProfile } from './workflow';
 import { PROFILES } from './workflow';
+import type { OpSpec, WorkspaceTool } from './tools';
+import { TOOL_REGISTRY, opFromSpec } from './tools';
 
 export interface TeamCalibrationInput {
   workspaceName: string;
@@ -13,6 +15,15 @@ export interface TeamCalibrationInput {
   /** Optional user sentence: "Who will use this agent, and for what?" -
    *  documents say the domain, not the role; this says the role. */
   intent?: string;
+}
+
+/** The full calibration verdict: the agents AND the workspace operations
+ *  they may request while diagnosing (already materialized into runnable
+ *  tools). Ops stay empty for purely informational corpora - the diagnose
+ *  path is their only consumer. */
+export interface TeamCalibration {
+  team: AgentSpec[];
+  ops: WorkspaceTool[];
 }
 
 const spec = (id: string, label: string, charter: string, profile: WorkflowProfile): AgentSpec =>
@@ -58,9 +69,7 @@ const KEYWORDS: Record<'insurance' | 'legal' | 'repair', string[]> = {
   repair: ['manual', 'manuel', 'service', 'repair', 'reparation', 'notice', 'troubleshoot', 'tm-', 'ifixit', 'schematic'],
 };
 
-/** Deterministic team from workspace name, file names and intent. The intent
- *  sentence counts double: it names the JOB, the file names only hint it. */
-export function heuristicTeam(input: TeamCalibrationInput): AgentSpec[] {
+function heuristicVertical(input: TeamCalibrationInput): keyof typeof KEYWORDS | null {
   const files = [input.workspaceName, ...input.fileNames].join(' ').toLowerCase();
   const intent = (input.intent ?? '').toLowerCase();
   let best: keyof typeof KEYWORDS | null = null;
@@ -69,7 +78,24 @@ export function heuristicTeam(input: TeamCalibrationInput): AgentSpec[] {
     const score = KEYWORDS[id].reduce((n, kw) => n + (files.includes(kw) ? 1 : 0) + (intent.includes(kw) ? 2 : 0), 0);
     if (score > bestScore) { best = id; bestScore = score; }
   }
-  return presetTeam(best ?? 'generic');
+  return best;
+}
+
+/** Deterministic team from workspace name, file names and intent. The intent
+ *  sentence counts double: it names the JOB, the file names only hint it. */
+export function heuristicTeam(input: TeamCalibrationInput): AgentSpec[] {
+  return presetTeam(heuristicVertical(input) ?? 'generic');
+}
+
+/** Deterministic fallback for the full calibration: only the repair vertical
+ *  ships hand-written ops; everything else diagnoses without any until the
+ *  model writes some. */
+export function heuristicCalibration(input: TeamCalibrationInput): TeamCalibration {
+  const vertical = heuristicVertical(input);
+  return {
+    team: presetTeam(vertical ?? 'generic'),
+    ops: vertical === 'repair' ? TOOL_REGISTRY : [],
+  };
 }
 
 /** Prompt for the live driver: the model designs the team itself. Flat
@@ -88,7 +114,11 @@ export function teamPrompt(input: TeamCalibrationInput): string {
     '"issueNoun": string (what a user ask is called), "retrievalHint": string (which page kinds matter first),',
     '"decisionMode": "diagnosis"|"answer" ("diagnosis" ONLY for physical equipment troubleshooting),',
     '"physicalTools": boolean (true only if technicians measure or replace parts),',
-    '"classifyHint": string (how to read category / brand / model for these documents)}]}',
+    '"classifyHint": string (how to read category / brand / model for these documents)}],',
+    '"ops": [the workspace operations agents may REQUEST while working a case, e.g.',
+    '{"id":"torque-spec-lookup","label":"Torque spec lookup","kind":"lookup","query":"torque specification chart","cue":"with args.fastener when tightening torque matters"}]}',
+    '"lookup" = a targeted search across these same documents (a spec table, a parts list, a coverage limit); "capture" = the user reports a real-world value (a measurement, a reading) the agent then verifies. "query" (lookup only) = 3-6 plain search keywords; "cue" mold: "with args.<name> when <the situation that justifies it>".',
+    'A purely informational corpus (every agent "answer") returns "ops": []. But when any agent has decisionMode "diagnosis", DO write the 2-3 ops its users will actually ask for - a parts availability lookup, a spec lookup, a measurement capture are typical.',
     'Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.',
   ].filter(Boolean).join(' ');
 }
@@ -125,4 +155,42 @@ export function parseTeam(text: string): AgentSpec[] | null {
     }));
   }
   return out.length > 0 ? out : null;
+}
+
+/** Strict validation of model-written ops; invalid entries drop silently
+ *  (a bad op must never sink the team that came with it). */
+export function parseOps(text: string): OpSpec[] {
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) return [];
+  let raw: { ops?: unknown };
+  try { raw = JSON.parse(m[0]) as { ops?: unknown }; } catch { return []; }
+  if (!Array.isArray(raw.ops)) return [];
+  const out: OpSpec[] = [];
+  for (const entry of raw.ops.slice(0, 3)) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const e = entry as Record<string, unknown>;
+    const str = (k: string): string | null =>
+      typeof e[k] === 'string' && (e[k] as string).trim().length > 0 ? (e[k] as string).trim() : null;
+    const label = str('label');
+    const cue = str('cue');
+    const query = str('query');
+    if (!label || !cue) continue;
+    if (e.kind !== 'lookup' && e.kind !== 'capture') continue;
+    if (e.kind === 'lookup' && !query) continue;
+    const id = str('id') ?? label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    if (out.some((o) => o.id === id)) continue;
+    out.push({ id, label, kind: e.kind, cue, query: e.kind === 'lookup' ? query ?? undefined : undefined });
+  }
+  return out;
+}
+
+/** Full calibration parse: no usable team means no usable calibration (the
+ *  caller falls back to the heuristic); ops are best-effort on top. When no
+ *  agent diagnoses, ops have no consumer - drop whatever the model wrote
+ *  rather than shipping decorative operations. */
+export function parseTeamCalibration(text: string): TeamCalibration | null {
+  const team = parseTeam(text);
+  if (!team) return null;
+  const diagnosing = team.some((a) => a.profile.decisionMode === 'diagnosis');
+  return { team, ops: diagnosing ? parseOps(text).map(opFromSpec) : [] };
 }

@@ -252,8 +252,10 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
 
   // TOOLS: the agent CHOSE its operations inside the verdict (diagnosis.tools
   // names registry ops); the loop only executes what was requested. Nothing
-  // is hard-wired: an answer-mode workspace exposes no ops at all.
-  const ops = workflowProfile().physicalTools ? activeTools() : [];
+  // is hard-wired: this point sits on the diagnose path only (answer-mode
+  // returned above), so whatever ops the workspace installed - shipped
+  // registry or calibration-written - are on offer.
+  const ops = activeTools();
   const requested = (diagnosis.tools ?? [])
     .map((req) => ({ req, tool: ops.find((t) => t.id === req.id) }))
     .filter((x): x is { req: { id: string; args?: Record<string, string> }; tool: (typeof ops)[number] } => x.tool !== undefined);
@@ -265,12 +267,20 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   });
   let part: PartLine | undefined;
   let safety: SafetyInfo | undefined;
-  const toolCtx = { device: conversation.device, component: `${diagnosis.componentKey ?? ''} ${diagnosis.component}`.trim() };
+  // Lookup ops search the workspace corpus themselves - hand them the pages.
+  const toolCtx = { device: conversation.device, component: `${diagnosis.componentKey ?? ''} ${diagnosis.component}`.trim(), pages: candidates };
   for (const { req, tool } of requested) {
     const run = await tool.run(req.args ?? {}, toolCtx);
     part = part ?? run.part;
     safety = safety ?? run.safety;
-    yield emit({ phase: 'tools', summary: `${tool.label}: ${run.summary}` });
+    yield emit({
+      phase: 'tools',
+      summary: `${tool.label}: ${run.summary}`,
+      ...(run.pages && run.pages.length > 0 ? {
+        hitPages: run.pages.map((p) => ({ docId: p.docId, page: p.page })),
+        citations: run.pages.map((p) => toCitation({ page: p, score: 0 })),
+      } : {}),
+    });
   }
 
   // DECIDE
@@ -295,7 +305,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   // Proposed actions follow the DIAGNOSIS, not a fixed script. The machine
   // key stays English even when the display language does not.
   const component = `${diagnosis.componentKey ?? ''} ${diagnosis.component}`.toLowerCase();
-  const canMeasure = ops.some((t) => t.id === 'measurement_check');
+  const canMeasure = ops.some((t) => t.kind === 'capture');
   const proposedNext: { label: string; action: string }[] = [];
   if (canMeasure && component.includes('heat')) {
     proposedNext.push(

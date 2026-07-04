@@ -1,11 +1,10 @@
 import type { ClassifyInput, DocMeta, ModelDriver, SufficiencyVerdict } from '../agent/driver';
 import type { Diagnosis, Page, PageKind, PlanAction, ScoredPage } from '../agent/types';
 import { workflowProfile } from '../agent/workflow';
-import type { AgentSpec } from '../agent/workflow';
 import { activeAgents } from '../agent/workflow';
-import type { TeamCalibrationInput } from '../agent/team';
-import { heuristicTeam, parseTeam, teamPrompt } from '../agent/team';
-import { activeTools } from '../agent/tools';
+import type { TeamCalibration, TeamCalibrationInput } from '../agent/team';
+import { heuristicCalibration, parseTeamCalibration, teamPrompt } from '../agent/team';
+import { activeTools, opsPromptSection } from '../agent/tools';
 
 export type Transport = (path: string, body: unknown) => Promise<any>;
 
@@ -211,11 +210,12 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
     // diagnosis fields themselves (component drifted to the symptom, the
     // rumination regime came back). One short sentence at the END, and the
     // shape only gains a defaulted "tools": [].
-    const ops = workflowProfile().physicalTools ? activeTools() : [];
+    // The diagnose path is the ops' only consumer (answer-mode never reaches
+    // it), so the gate is the decision mode itself: calibrated diagnostic
+    // workspaces get their ops even without the physical-tools flag.
+    const ops = workflowProfile().decisionMode === 'diagnosis' ? activeTools() : [];
     const basePrompt = (withOps: boolean) => {
-      const opsSection = withOps && ops.length > 0
-        ? ` After the diagnosis fields are set, request follow-up workspace operations in "tools" when they apply: ${ops.map((t) => `{"id":"${t.id}","args":{...}}`).join(', ')} (part_lookup with args.component when one replaceable component is the prime suspect; safety_notes with args.operation before hands-on work; measurement_check with args.component when a reading would decide). Never let tool choice alter the diagnosis fields.`
-        : '';
+      const opsSection = withOps ? opsPromptSection(ops) : '';
       const jsonTools = withOps && ops.length > 0 ? ', "tools": []' : '';
       return `You are ${workflowProfile().agentRole} producing a grounded verdict. ${workflowProfile().subjectNoun}: ${q.device}. ${workflowProfile().issueNoun}: ${q.symptom}.\nGround yourself ONLY in the attached manual pages${techPhoto ? ' and the technician photo (last image)' : ''}. Return STRICT JSON: {"component": string, "cause": string, "checks": [string, string, string], "instruction": string, "componentKey": "heater"|"thermistor"|"sensor"|"pump"|"motor"|"board"|"wiring"|"other"${jsonTools}} - checks must be concrete ACTIONS the technician performs (measure X, inspect Y), ordered, with measurable values when the pages give them; instruction = one or two sentences guiding the technician: the FIRST concrete action with its expected measurable value from the pages, then what the result decides next; varied phrasing, no boilerplate prefix. Write component/cause/checks in ${AGENT_LANG}; keep part numbers and error codes verbatim.${opsSection} If a page gives a STEP-BY-STEP troubleshooting procedure with several candidate causes for this exact malfunction, that IS a valid diagnosis: component = the target of the procedure's first step, cause = the malfunction line as printed, checks = the procedure's first steps in their printed order (cite the paragraph numbers). Only set component to "insufficient evidence" when no retained page addresses the symptom at all. Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.`;
     };
@@ -277,11 +277,12 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
     return null;
   }
 
-  async calibrateTeam(input: TeamCalibrationInput): Promise<AgentSpec[]> {
-    // Nemotron designs the agent team from the corpus signal and the user's
-    // intent sentence; any parse failure falls back to the keyword heuristic.
+  async calibrateTeam(input: TeamCalibrationInput): Promise<TeamCalibration> {
+    // Nemotron designs the agent team AND its workspace ops from the corpus
+    // signal and the user's intent sentence; any parse failure falls back to
+    // the keyword heuristic.
     const text = await chatText(this.t, MODELS.omni, [{ type: 'text', text: teamPrompt(input) }], 8000);
-    return parseTeam(text) ?? heuristicTeam(input);
+    return parseTeamCalibration(text) ?? heuristicCalibration(input);
   }
 
   async tagPages(pages: { page: number; text?: string }[]): Promise<Record<number, PageKind>> {
