@@ -563,7 +563,7 @@ function FloatingPage({ url, label, title, index, total, anchor, color, onClick 
 
   if (!tex) return null;
   return (
-    <group ref={group} position={anchor}>
+    <group ref={group} position={target}>
       <Billboard>
         <mesh position={[0, 0, -0.004]}>
           <planeGeometry args={[W + 0.02, H + 0.02]} />
@@ -611,23 +611,38 @@ function FloatingPage({ url, label, title, index, total, anchor, color, onClick 
 /* ---------- camera: the agent drives the eye ---------- */
 
 function CameraRig({ focus, panelOpen }: { focus: THREE.Vector3 | null; panelOpen: boolean }) {
-  const { camera } = useThree();
+  const { camera, size } = useThree();
   const controls = useRef<any>(null);
 
+  // Chat panel covers the left half: shift the RENDER, not the camera target.
+  // setViewOffset has no feedback loop, so the camera can truly come to rest
+  // (the old camera-space shift orbited forever and made the cards drift).
+  const viewX = useRef(0);
   useFrame((_, dt) => {
+    const cam = camera as THREE.PerspectiveCamera;
+    const wantX = panelOpen ? -Math.min(640, size.width * 0.46) / 2 : 0;
+    if (Math.abs(viewX.current - wantX) > 0.5) {
+      viewX.current = THREE.MathUtils.lerp(viewX.current, wantX, Math.min(dt * 5, 1));
+      cam.setViewOffset(size.width, size.height, viewX.current, 0, size.width, size.height);
+    } else if (viewX.current !== wantX) {
+      viewX.current = wantX; // settle exactly, then never touch it again
+      if (wantX === 0) cam.clearViewOffset();
+      else cam.setViewOffset(size.width, size.height, wantX, 0, size.width, size.height);
+    }
+
     if (!controls.current) return;
     const c = controls.current;
     const lookTarget = focus ? focus.clone().multiplyScalar(0.82) : new THREE.Vector3(0, 0, 0);
-    if (panelOpen) {
-      // Chat panel covers the left half: shift the look target left in camera
-      // space so the planet re-centers in the right half of the screen.
-      const right = new THREE.Vector3().subVectors(c.target, camera.position).cross(camera.up).normalize();
-      lookTarget.addScaledVector(right, -1.15);
-    }
-    c.target.lerp(lookTarget, Math.min(dt * 2.4, 1));
-
     const wantDist = focus ? 6.2 : 10.2;
     const dir = new THREE.Vector3().subVectors(camera.position, c.target);
+
+    // At rest, STOP: an asymptotic lerp never truly arrives, and billboarded
+    // cards re-face the drifting camera forever (the frozen-world rule).
+    const targetErr = c.target.distanceTo(lookTarget);
+    const distErr = Math.abs(dir.length() - wantDist);
+    if (targetErr < 0.005 && distErr < 0.01) return;
+
+    c.target.lerp(lookTarget, Math.min(dt * 2.4, 1));
     const newDist = THREE.MathUtils.lerp(dir.length(), wantDist, Math.min(dt * 1.6, 1));
     camera.position.copy(c.target.clone().addScaledVector(dir.normalize(), newDist));
     c.update();
@@ -659,7 +674,9 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
   const inScope = (docId: string) => !scopeActive || (scopeIds?.has(docId) ?? true);
   // Where a doc LIVES right now: scoped files migrate into a tight working
   // system around the core; ghosts stay out on the full shell.
-  const livePos = (n: FileNode) => (scopeActive && inScope(n.doc.id) ? n.pos.clone().multiplyScalar(0.5) : n.pos);
+  // Files NEVER relocate: context recursion shows through light only
+  // (in-scope stays lit, the rest turn ghost). The world is still.
+  const livePos = (n: FileNode) => n.pos;
 
   const { nodes, catAnchors } = useMemo(() => {
     const categories = [...new Set(docs.map((d) => d.category))].sort();
