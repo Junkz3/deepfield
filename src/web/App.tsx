@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { categoryScope, scopeDocIds } from '../agent/taxonomy';
 import { installWorkspaceOps, TOOL_REGISTRY } from '../agent/tools';
@@ -13,6 +13,7 @@ import { CommandBar } from './components/CommandBar';
 import { CategoryFilter } from './components/CategoryFilter';
 import { PageLightbox } from './components/PageLightbox';
 import { SelfCheckPanel } from './components/SelfCheckPanel';
+import { AuthGate } from './components/AuthGate';
 import './app.css';
 import './components/galaxy.css';
 
@@ -27,10 +28,24 @@ function Shell() {
   const [catFilter, setCatFilter] = useState<string | null>(null);
   const inConversation = state.activeView.kind === 'conversation';
 
+  // Per-user upload quota (enterprise guardrail; also keeps a stray 600 MB
+  // drop from freezing a demo). Counter follows the session docs' lifetime.
+  const STORAGE_LIMIT_MB = 100;
+  const ingestedBytesRef = useRef(0);
+  useEffect(() => {
+    if (state.sessionDocs.length === 0) ingestedBytesRef.current = 0;
+  }, [state.sessionDocs.length]);
+
   const ingestFiles = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
     const driver = await getDriver(state.driverKind);
     for (const file of files) {
+      if (ingestedBytesRef.current + file.size > STORAGE_LIMIT_MB * 1024 * 1024) {
+        setIngesting(`Storage limit: ${STORAGE_LIMIT_MB} MB per user. "${file.name}" (${(file.size / 1024 / 1024).toFixed(0)} MB) was skipped.`);
+        setTimeout(() => setIngesting(null), 4000);
+        continue;
+      }
+      ingestedBytesRef.current += file.size;
       setIngesting(`Reading and classifying "${file.name}"…`);
       dispatch({ type: 'ingest-start', name: file.name });
       try {
@@ -159,9 +174,21 @@ function Shell() {
         {/* Studio floats over the live (empty) universe: creation happens in plain sight. */}
         {state.studioMode && (
           <DeepfieldStudio
-            onCreate={(name, corpus, liveFiles) => {
+            onCreate={(name, corpus, liveFiles, team, ops) => {
               if (liveFiles.length > 0) setStudioQueue(liveFiles);
-              dispatch({ type: 'create-workspace', name, corpus });
+              dispatch({ type: 'create-workspace', name, corpus, team, ops });
+            }}
+          />
+        )}
+
+        {/* Same Studio as an in-app panel: the sidebar stays, the new
+            workspace parks the current one and both stay switchable. */}
+        {state.studioOpen && !state.studioMode && (
+          <DeepfieldStudio
+            onClose={() => dispatch({ type: 'close-studio' })}
+            onCreate={(name, corpus, liveFiles, team, ops) => {
+              if (liveFiles.length > 0) setStudioQueue(liveFiles);
+              dispatch({ type: 'add-workspace', id: `ws-${Date.now()}`, name, corpus, team, ops });
             }}
           />
         )}
@@ -174,8 +201,10 @@ function Shell() {
 
 export function App() {
   return (
-    <AppProvider>
-      <Shell />
-    </AppProvider>
+    <AuthGate>
+      <AppProvider>
+        <Shell />
+      </AppProvider>
+    </AuthGate>
   );
 }

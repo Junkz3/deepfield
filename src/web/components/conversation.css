@@ -869,3 +869,10 @@
   line-height: 1.5;
 }
 .step-verdict-reads { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+
+/* Nova rides the live reasoning step only; finished steps stay untouched. */
+.step-head-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}

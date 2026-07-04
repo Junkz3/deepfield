@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 400" role="img" aria-label="Nova, the Deepfield mascot: a small plasma core lighting up a document star">
+  <defs>
+    <radialGradient id="core" cx="50%" cy="55%" r="50%">
+      <stop offset="0%" stop-color="#eaf6ff" stop-opacity="0.9"/>
+      <stop offset="30%" stop-color="#9fd8ff" stop-opacity="0.65"/>
+      <stop offset="60%" stop-color="#59c2ff" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#59c2ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="rim" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#59c2ff" stop-opacity="0"/>
+      <stop offset="82%" stop-color="#59c2ff" stop-opacity="0"/>
+      <stop offset="97%" stop-color="#59c2ff" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#59c2ff" stop-opacity="0.16"/>
+    </radialGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="3.2" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="bigglow" x="-120%" y="-120%" width="340%" height="340%">
+      <feGaussianBlur stdDeviation="7" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- space card -->
+  <rect x="0" y="0" width="720" height="400" rx="18" fill="#0b1118"/>
+
+  <!-- background stars -->
+  <g fill="#c7d3de">
+    <circle cx="72" cy="58" r="1.2" opacity="0.45"/>
+    <circle cx="158" cy="132" r="0.9" opacity="0.3"/>
+    <circle cx="118" cy="286" r="1.4" opacity="0.5"/>
+    <circle cx="205" cy="352" r="1" opacity="0.32"/>
+    <circle cx="262" cy="66" r="1.1" opacity="0.4"/>
+    <circle cx="415" cy="330" r="1.3" opacity="0.45"/>
+    <circle cx="480" cy="270" r="0.9" opacity="0.3"/>
+    <circle cx="545" cy="345" r="1.2" opacity="0.42"/>
+    <circle cx="628" cy="90" r="1" opacity="0.35"/>
+    <circle cx="662" cy="228" r="1.3" opacity="0.5"/>
+    <circle cx="586" cy="160" r="0.9" opacity="0.3"/>
+    <circle cx="52" cy="180" r="1" opacity="0.35"/>
+    <circle cx="340" cy="40" r="0.9" opacity="0.3"/>
+    <circle cx="690" cy="330" r="1" opacity="0.35"/>
+    <circle cx="30" cy="350" r="0.9" opacity="0.3"/>
+  </g>
+
+  <!-- faint document stars (cyan, not yet lit) -->
+  <g fill="#59c2ff" filter="url(#glow)">
+    <circle cx="150" cy="92" r="2.4" opacity="0.5"/>
+    <circle cx="604" cy="288" r="2.2" opacity="0.45"/>
+    <circle cx="96" cy="230" r="2" opacity="0.4"/>
+    <circle cx="560" cy="70" r="2" opacity="0.4"/>
+  </g>
+
+  <!-- the document star Nova is lighting up -->
+  <g filter="url(#bigglow)">
+    <circle cx="512" cy="96" r="5" fill="#ffc678"/>
+    <g stroke="#ffc678" stroke-width="1.6" stroke-linecap="round" opacity="0.85">
+      <line x1="512" y1="82" x2="512" y2="72"/>
+      <line x1="512" y1="110" x2="512" y2="120"/>
+      <line x1="498" y1="96" x2="488" y2="96"/>
+      <line x1="526" y1="96" x2="536" y2="96"/>
+    </g>
+  </g>
+
+  <!-- ===================== NOVA ===================== -->
+  <!-- membrane -->
+  <circle cx="330" cy="212" r="108" fill="url(#rim)" stroke="#2a3644" stroke-width="2"/>
+  <circle cx="330" cy="212" r="104" fill="none" stroke="#59c2ff" stroke-width="1" opacity="0.14"/>
+
+  <!-- side filaments (calm, three passes each) -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M322 234 L302 240 L286 234 L262 256 L252 252 L240 270" stroke="#59c2ff" stroke-width="6" opacity="0.16"/>
+    <path d="M322 234 L302 240 L286 234 L262 256 L252 252 L240 270" stroke="#59c2ff" stroke-width="2.6" opacity="0.5"/>
+    <path d="M322 234 L302 240 L286 234 L262 256 L252 252 L240 270" stroke="#ffffff" stroke-width="1.1" opacity="0.9"/>
+
+    <path d="M332 236 L342 250 L336 262 L352 284 L348 296 L360 314" stroke="#59c2ff" stroke-width="6" opacity="0.14"/>
+    <path d="M332 236 L342 250 L336 262 L352 284 L348 296 L360 314" stroke="#59c2ff" stroke-width="2.4" opacity="0.42"/>
+    <path d="M332 236 L342 250 L336 262 L352 284 L348 296 L360 314" stroke="#ffffff" stroke-width="1" opacity="0.8"/>
+  </g>
+
+  <!-- the big spark filament, reaching the membrane toward the document star -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M352 220 L370 210 L374 198 L390 188 L388 176 L404 166 L408 154 L418 148" stroke="#59c2ff" stroke-width="9" opacity="0.2"/>
+    <path d="M352 220 L370 210 L374 198 L390 188 L388 176 L404 166 L408 154 L418 148" stroke="#59c2ff" stroke-width="3.6" opacity="0.6"/>
+    <path d="M352 220 L370 210 L374 198 L390 188 L388 176 L404 166 L408 154 L418 148" stroke="#ffffff" stroke-width="1.6" opacity="0.95"/>
+  </g>
+
+  <!-- amber flash where the filament meets the membrane -->
+  <g filter="url(#bigglow)">
+    <circle cx="419" cy="147" r="6" fill="#ffc678"/>
+    <g stroke="#ffc678" stroke-width="2" stroke-linecap="round" opacity="0.9">
+      <line x1="419" y1="133" x2="419" y2="124"/>
+      <line x1="419" y1="161" x2="419" y2="170"/>
+      <line x1="405" y1="147" x2="396" y2="147"/>
+      <line x1="433" y1="147" x2="442" y2="147"/>
+      <line x1="429" y1="137" x2="436" y2="130"/>
+      <line x1="409" y1="157" x2="402" y2="164"/>
+    </g>
+  </g>
+
+  <!-- link from flash to the document star -->
+  <path d="M428 141 L446 132 L444 124 L468 114 L466 106 L488 100 L504 96" fill="none" stroke="#ffc678" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85" filter="url(#glow)"/>
+
+  <!-- core -->
+  <circle cx="330" cy="212" r="58" fill="url(#core)"/>
+
+  <!-- happy eyes (closed arcs) -->
+  <g fill="none" stroke="#ffffff" stroke-width="5.5" stroke-linecap="round" filter="url(#glow)">
+    <path d="M296 212 Q 308 199 320 212"/>
+    <path d="M340 212 Q 352 199 364 212"/>
+  </g>
+</svg>

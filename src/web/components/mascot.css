@@ -1,0 +1,48 @@
+/* Nova mascot. The plasma crackle is two path variants per filament (A/B)
+   flickering in alternation, mimicking Galaxy3D's bolt regeneration. All
+   filaments flicker in sync, like the real plasma globe. */
+
+.mascot {
+  display: block;
+  --mascot-fil-speed: 2.6s;
+}
+
+.mascot--thinking { --mascot-fil-speed: 0.55s; }
+.mascot--spark { --mascot-fil-speed: 1.1s; }
+
+.mascot-core {
+  animation: mascot-pulse 3s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+.mascot--thinking .mascot-core { animation-duration: 1.4s; }
+.mascot--spark .mascot-core { animation-duration: 1.8s; }
+.mascot--oops .mascot-core { animation-duration: 5s; }
+
+.mascot-fil-a,
+.mascot-fil-b {
+  animation: mascot-flicker var(--mascot-fil-speed) steps(1) infinite;
+}
+.mascot-fil-b {
+  animation-delay: calc(var(--mascot-fil-speed) / -2);
+}
+
+@keyframes mascot-flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes mascot-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.06); opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot .mascot-core,
+  .mascot .mascot-fil-a,
+  .mascot .mascot-fil-b {
+    animation: none;
+  }
+  /* static pose: keep the A variant only */
+  .mascot .mascot-fil-b { opacity: 0; }
+}

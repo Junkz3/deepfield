@@ -34,6 +34,10 @@ seen, not text-extracted.
 
 ## Beyond repair: the Deepfield engine
 
+<img src="public/nova.svg" width="360" alt="Nova, the Deepfield mascot, a small plasma core lighting up a document star">
+
+*Meet Nova, the Deepfield core. Every document is a star; she lights them up.*
+
 Nothing in the engine is repair-specific. Visual retrieval over page images, automatic
 taxonomy, the navigable 3D universe and page-exact citations work on any document corpus.
 RepairCenter is the first app built on Deepfield: open the Studio (`/?studio`), name a

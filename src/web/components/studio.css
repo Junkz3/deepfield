@@ -348,3 +348,27 @@
   color: var(--text-faint);
   padding: var(--sp-2) 0;
 }
+
+/* In-app panel mode: a way back to the workspace being left open. */
+.studio-card { position: relative; }
+.studio-close {
+  position: absolute;
+  top: var(--sp-3);
+  right: var(--sp-3);
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--fg2);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.studio-close:hover { border-color: var(--accent); color: var(--fg0); }
+
+/* Nova idles between the card and the footer, part of the same fade. */
+.studio-nova {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--sp-4);
+  opacity: 0.9;
+}

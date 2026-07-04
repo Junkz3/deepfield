@@ -55,5 +55,5 @@ function devAgentProxy(): Plugin {
 
 export default defineConfig({
   plugins: [react(), devAgentProxy()],
-  test: { include: ['src/**/*.test.ts'] },
+  test: { include: ['src/**/*.test.{ts,tsx}'] },
 } as any);

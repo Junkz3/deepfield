@@ -81,8 +81,13 @@ export function CommandBar() {
         </button>
         <input
           className="cmdbar-input"
-          placeholder="Ask the agent — 'Whirlpool dishwasher: error E3, no heat' or any question about the universe"
+          placeholder={
+            (state.team.find((a) => a.active) ?? state.team[0])?.profile.decisionMode === 'answer'
+              ? "Ask the agent: 'Is a cracked windscreen covered by my policy?' or any question about the documents"
+              : "Ask the agent: 'Whirlpool dishwasher: error E3, no heat' or any question about the universe"
+          }
           value={text}
+          enterKeyHint="send"
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
         />

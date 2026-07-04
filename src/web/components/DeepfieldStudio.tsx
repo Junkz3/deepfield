@@ -10,6 +10,7 @@ import { setWorkflowProfile } from '../../agent/workflow';
 import { getDriver } from '../driver-factory';
 import { initialDriverKind, LANGS, useApp } from '../store';
 import { splitSeedFiles } from '../studio';
+import { Mascot } from './Mascot';
 import './studio.css';
 
 /** Deepfield Studio: the workspace creation screen shown before boot (?studio).
@@ -348,6 +349,10 @@ export function DeepfieldStudio({ onCreate, onClose }: Props) {
             </div>
           )}
         </section>
+
+        <div className="studio-nova fade-up" aria-hidden>
+          <Mascot mood="idle" size={64} />
+        </div>
 
         <footer className="studio-foot mono fade-up">
           deepfield · the document-universe engine

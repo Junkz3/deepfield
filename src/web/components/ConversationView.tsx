@@ -5,6 +5,7 @@ import type { Citation, GuidedStep } from '../../agent/types';
 import { useStepRunner } from '../hooks/useStepRunner';
 import { useApp } from '../store';
 import { AgentDock } from './AgentDock';
+import { Mascot } from './Mascot';
 import { VoiceInput } from './VoiceInput';
 import { Timeline } from './Timeline';
 import { WorkOrderView } from './WorkOrderView';
@@ -91,6 +92,49 @@ function StepCard({ step, isLast, onAction, onOpenCite, onOpenPage }: {
       </header>
       <Timeline events={step.phaseEvents} running={false} onOpenPage={onOpenPage} />
       {step.answer ? <AnswerBlock text={step.answer} /> : <p className="step-instruction">{step.instruction}</p>}
+      {/* The full verdict, not just the guidance line: what the agent read
+          out of the pages - fault, printed cause, ordered checks. */}
+      {!step.answer && step.diagnosis && step.status === 'ok' && (
+        <div className="step-verdict">
+          <div className="step-verdict-row">
+            <span className="step-verdict-k mono">FAULT</span>
+            <span className="step-verdict-v">{step.diagnosis.component}</span>
+          </div>
+          {step.diagnosis.cause && (
+            <div className="step-verdict-row">
+              <span className="step-verdict-k mono">CAUSE</span>
+              <span className="step-verdict-v">{step.diagnosis.cause}</span>
+            </div>
+          )}
+          {step.diagnosis.checks.length > 0 && (
+            <div className="step-verdict-row">
+              <span className="step-verdict-k mono">CHECKS</span>
+              <ol className="step-verdict-checks">
+                {step.diagnosis.checks.map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
+              </ol>
+            </div>
+          )}
+          {step.readPages && step.readPages.length > 0 && (
+            <div className="step-verdict-row">
+              <span className="step-verdict-k mono">READ</span>
+              <span className="step-verdict-reads">
+                {step.readPages.map((p) => (
+                  <button
+                    key={`${p.docId}-${p.page}`}
+                    className="timeline-hit mono"
+                    title={`${p.docId} - open this page`}
+                    onClick={() => onOpenPage(p.docId, p.page)}
+                  >
+                    p.{p.page}
+                  </button>
+                ))}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
       <CiteChips citations={step.citations} onOpen={onOpenCite} />
       <ConfidenceMeter value={step.confidence} reason={step.confidenceReason} />
       {isLast && step.proposedNext.length > 0 && (
@@ -155,6 +199,9 @@ export function ConversationView({ id }: { id: string }) {
       const idx = Number(action.split(':')[1] ?? 0);
       const c = lastCitations[idx] ?? lastCitations[0];
       if (c) openCite(c);
+    } else if (action.startsWith('ask:')) {
+      // Model-written follow-up: plain conversation, same as typing it.
+      void run(action.slice(4));
     } else {
       void run(action || undefined);
     }
@@ -200,7 +247,10 @@ export function ConversationView({ id }: { id: string }) {
         {live.running && (
           <article className="step-card panel live">
             <header className="step-head">
-              <span className="step-index mono">STEP {conv.steps.length + 1}</span>
+              <span className="step-head-left">
+                <Mascot mood="thinking" size={28} />
+                <span className="step-index mono">STEP {conv.steps.length + 1}</span>
+              </span>
               <span className="step-status mono live-chip">
                 <span className="live-dot" />
                 {state.driverKind === 'vultr' ? 'REASONING ON VULTR' : 'REASONING'}
@@ -236,6 +286,7 @@ function FreeReply({ disabled, onSend }: { disabled: boolean; onSend: (text: str
         placeholder={disabled ? 'The agent is working…' : 'Answer the agent or ask anything about this repair…'}
         value={text}
         disabled={disabled}
+        enterKeyHint="send"
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && submit()}
       />
