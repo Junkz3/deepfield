@@ -1,0 +1,31 @@
+.shell {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(1200px 800px at 70% 30%, rgba(89, 194, 255, 0.04), transparent 60%),
+    var(--bg0);
+}
+
+.view-placeholder {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  color: var(--text-dim);
+}
+.view-placeholder h1 {
+  margin: 0;
+  font-size: var(--fs-hero);
+  font-weight: 650;
+  color: var(--text);
+}

@@ -1,0 +1,166 @@
+/* RepairCenter design tokens — dark control-room language.
+   One place for palette, type, spacing, motion. No UI kit. */
+
+:root {
+  /* Surfaces */
+  --bg0: #0b0f14;      /* app background, near-black blue */
+  --bg1: #11161d;      /* panels */
+  --bg2: #171e27;      /* raised elements, cards */
+  --bg3: #1e2733;      /* hover / active surfaces */
+  --line: #232c37;     /* hairline borders */
+  --line-strong: #2f3b49;
+
+  /* Text */
+  --text: #dee7ef;
+  --text-dim: #8b99a8;
+  --text-faint: #5c6875;
+
+  /* The agent = a warm work light at the center of the galaxy */
+  --accent: #ffb454;
+  --accent-strong: #ffc678;
+  --accent-dim: rgba(255, 180, 84, 0.14);
+  --accent-glow: rgba(255, 180, 84, 0.45);
+
+  /* Signals */
+  --ok: #7fd962;
+  --warn: #ffb454;
+  --err: #f0716a;
+  --info: #59c2ff;
+
+  /* Category accents (galaxy constellations, badges, tree) */
+  --cat-dishwasher: #59c2ff;
+  --cat-washing-machine: #6e9cff;
+  --cat-vehicle: #a3d977;
+  --cat-smartphone: #c792ea;
+  --cat-game-console: #f07178;
+  --cat-coffee-machine: #e6b455;
+  --cat-uncategorized: #8b99a8;
+
+  /* Type */
+  --font-ui: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --fs-xs: 11px;
+  --fs-sm: 12.5px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-hero: 28px;
+
+  /* Space (4px grid) */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px;
+
+  /* Shape + depth */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 6px 24px rgba(0, 0, 0, 0.45);
+
+  /* Motion */
+  --t-fast: 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --t-med: 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --t-slow: 640ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg0);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--accent-dim); }
+
+/* Scrollbars that belong to the room */
+* { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+input, textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-2) var(--sp-3);
+  outline: none;
+  transition: border-color var(--t-fast);
+}
+input:focus, textarea:focus { border-color: var(--accent); }
+input::placeholder, textarea::placeholder { color: var(--text-faint); }
+
+code, .mono { font-family: var(--font-mono); font-size: 0.92em; }
+
+/* Shared primitives */
+.panel {
+  background: var(--bg1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--bg2);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  transition: background var(--t-fast), border-color var(--t-fast), transform var(--t-fast);
+}
+.btn:hover { background: var(--bg3); border-color: var(--accent); }
+.btn:active { transform: translateY(1px); }
+.btn-primary {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+.btn-primary:hover { background: rgba(255, 180, 84, 0.22); }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  border: 1px solid var(--line-strong);
+  color: var(--text-dim);
+}
+.chip .dot { width: 6px; height: 6px; border-radius: 50%; }
+
+@keyframes rc-pulse {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
+}
+@keyframes rc-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.fade-up { animation: rc-fade-up var(--t-med) both; }
