@@ -7,3 +7,4 @@ dist/
 .wrangler/
 corpus/src/
 *.log
+public/corpus/

@@ -55,11 +55,13 @@ the production proxy in `functions/api/agent.ts`) forwards only `/chat/completio
 
 ## Corpus
 
-The demo universe ships 30 documents, 402 pages, 26 device categories: dishwasher service manual,
-a 1704-page HMMWV military TM, tactical generators, printers, drones, chainsaws, a sewing
-machine, a repair video with chapter-accurate citations, and more. `npm run ingest` rebuilds
-`public/corpus/` from `corpus/manifest.json` (pages rendered at 120 DPI, text layer and layout
-blocks extracted per page, video chapters mapped to timestamped segments with extracted frames).
+The demo universe ships 30 documents across 26 device categories, ingested at FULL depth
+(thousands of pages): complete service and user manuals, military TMs, a repair video with
+chapter-accurate citations. Retrieval cost does not grow with corpus size: the two-stage
+design always sends at most 24 page images to the visual reranker per query. `npm run ingest`
+rebuilds `public/corpus/` from `corpus/manifest.json` (pages rendered at 120 DPI, text layer
+and layout blocks extracted per page, video chapters mapped to timestamped segments). The
+generated corpus is a build artifact and is not versioned in this repo.
 
 Sources and rights for every document are listed in [SOURCES.md](SOURCES.md). Nothing is
 re-hosted that should not be: videos play in the official embedded player.

@@ -8,6 +8,7 @@
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
+import { gzipSync } from 'node:zlib';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const DIST = process.env.DIST ?? 'dist';
@@ -74,10 +75,19 @@ const server = createServer(async (req, res) => {
       file = join(DIST, 'index.html');
     }
     const data = await readFile(file);
-    res.writeHead(200, {
-      'content-type': MIME[extname(file)] ?? 'application/octet-stream',
+    const type = MIME[extname(file)] ?? 'application/octet-stream';
+    const headers = {
+      'content-type': type,
       'cache-control': file.endsWith('index.html') ? 'no-cache' : 'public, max-age=86400',
-    });
+    };
+    // Full-corpus docs.json is tens of MB of text: gzip compressible types.
+    const compressible = /json|javascript|text|svg/.test(type);
+    if (compressible && (req.headers['accept-encoding'] ?? '').includes('gzip')) {
+      res.writeHead(200, { ...headers, 'content-encoding': 'gzip' });
+      res.end(gzipSync(data));
+      return;
+    }
+    res.writeHead(200, headers);
     res.end(data);
   } catch (e) {
     res.writeHead(500).end(`server error: ${e instanceof Error ? e.message : 'unknown'}`);
