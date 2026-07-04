@@ -226,6 +226,14 @@ export function ConversationView({ id }: { id: string }) {
         </div>
       </header>
 
+      {/* No silent scripts: when the offline driver answers, say so where
+          the answers are read, not only in the sidebar footer. */}
+      {state.driverKind === 'fake' && (
+        <div className="conv-offline mono">
+          OFFLINE SCRIPT: these answers are a scripted demo. Switch the driver in the sidebar for live inference.
+        </div>
+      )}
+
       <div className="conv-stream" ref={streamRef}>
         {conv.steps.map((s, i) => (
           <div key={s.index} className="step-group">
