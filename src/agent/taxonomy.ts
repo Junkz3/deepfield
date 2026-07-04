@@ -64,6 +64,12 @@ export function scopeDocIds(docs: Document[], deviceQuery: string): Set<string> 
   return new Set(scope.map((d) => d.id));
 }
 
+/** User-driven universe filter: exact category match, unlike the fuzzy
+ *  device-query scoping above (categories are canonical corpus values). */
+export function categoryScope(docs: Document[], category: string): Set<string> {
+  return new Set(docs.filter((d) => d.category === category).map((d) => d.id));
+}
+
 export function candidatePages(docs: Document[], deviceQuery: string): Page[] {
   const ids = scopeDocIds(docs, deviceQuery);
   return docs.filter((d) => ids.has(d.id)).flatMap((d) => d.pages);

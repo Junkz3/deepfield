@@ -133,14 +133,6 @@
 .galaxy-card-rights { color: var(--text-faint); font-size: var(--fs-xs); margin-top: 6px; font-style: italic; }
 
 /* Overlays */
-.galaxy-tree-toggle {
-  position: absolute;
-  top: var(--sp-4);
-  left: var(--sp-4);
-  z-index: 20;
-}
-.galaxy-tree-toggle.active { border-color: var(--accent); color: var(--accent-strong); }
-
 .galaxy-vr-btn {
   position: absolute;
   top: var(--sp-4);
@@ -161,16 +153,6 @@
   pointer-events: none;
 }
 
-.galaxy-tree-drawer {
-  position: absolute;
-  top: 64px;
-  left: var(--sp-4);
-  z-index: 20;
-  width: 300px;
-  max-height: calc(100% - 220px);
-  overflow-y: auto;
-}
-
 .galaxy-command {
   position: absolute;
   bottom: var(--sp-5);
@@ -189,42 +171,6 @@
   box-shadow: var(--shadow-2);
 }
 
-/* Tree panel */
-.tree-panel { padding: var(--sp-3); }
-.tree-head {
-  font-size: var(--fs-xs);
-  letter-spacing: 0.18em;
-  color: var(--text-faint);
-  padding-bottom: var(--sp-2);
-}
-.tree-row {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  width: 100%;
-  text-align: left;
-  padding: 3px 6px;
-  border-radius: var(--radius-sm);
-  font-size: var(--fs-sm);
-  transition: background var(--t-fast);
-}
-.tree-row:hover { background: var(--bg2); }
-.tree-caret { color: var(--text-faint); width: 10px; }
-.tree-swatch { width: 8px; height: 8px; border-radius: 2px; }
-.tree-label.category { font-weight: 650; text-transform: capitalize; }
-.tree-label.brand { color: var(--text-dim); }
-.tree-label.model { color: var(--text); }
-.tree-label.document { color: var(--text-dim); font-size: var(--fs-xs); }
-.tree-count { margin-left: auto; color: var(--text-faint); font-size: var(--fs-xs); }
-.tree-session {
-  margin-left: 6px;
-  color: var(--accent);
-  font-size: var(--fs-xs);
-  border: 1px solid var(--accent);
-  border-radius: 999px;
-  padding: 0 6px;
-}
-
 .galaxy-loading {
   position: absolute;
   inset: 0;
@@ -235,10 +181,80 @@
   font-size: var(--fs-sm);
 }
 
+/* Add files: glassy pill whose dashed border echoes the drop zone */
 .galaxy-add {
   position: absolute;
   top: var(--sp-4);
-  left: 150px;
+  left: var(--sp-4);
   z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
   cursor: pointer;
+  border-radius: 999px;
+  border: 1px dashed var(--line-strong);
+  background: rgba(17, 22, 29, 0.82);
+  backdrop-filter: blur(14px);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  transition: border-color var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
 }
+.galaxy-add:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  box-shadow: 0 0 18px rgba(255, 180, 84, 0.18);
+}
+.galaxy-add-plus {
+  color: var(--accent-strong);
+  font-size: var(--fs-md);
+  line-height: 1;
+}
+
+/* Category filter: one compact pill, unfolds into the category list */
+.galaxy-filter {
+  position: absolute;
+  top: var(--sp-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.galaxy-filter-chip {
+  cursor: pointer;
+  background: rgba(17, 22, 29, 0.82);
+  backdrop-filter: blur(14px);
+  text-transform: capitalize;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+.galaxy-filter-chip:hover { background: var(--bg3); border-color: var(--accent); color: var(--text); }
+.galaxy-filter-chip.active { color: var(--accent-strong); border-color: var(--accent); }
+.galaxy-filter-caret { color: var(--text-faint); }
+
+.galaxy-filter-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 190px;
+  max-height: 50vh;
+  overflow-y: auto;
+  padding: var(--sp-2);
+  background: rgba(17, 22, 29, 0.82);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
+}
+.galaxy-filter-menu .galaxy-filter-chip {
+  justify-content: flex-start;
+  width: 100%;
+  background: transparent;
+  backdrop-filter: none;
+  border-color: transparent;
+}
+.galaxy-filter-menu .galaxy-filter-chip:hover { background: var(--bg3); border-color: var(--line-strong); }
+.galaxy-filter-menu .galaxy-filter-chip.active { border-color: currentColor; }

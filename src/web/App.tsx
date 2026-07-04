@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import type { DragEvent } from 'react';
-import { scopeDocIds } from '../agent/taxonomy';
+import { categoryScope, scopeDocIds } from '../agent/taxonomy';
 import { installWorkspaceOps, TOOL_REGISTRY } from '../agent/tools';
 import { setWorkflowProfile } from '../agent/workflow';
 import { getDriver } from './driver-factory';
@@ -10,9 +10,9 @@ import { Sidebar } from './components/Sidebar';
 import { DeepfieldStudio } from './components/DeepfieldStudio';
 import { ConversationView } from './components/ConversationView';
 import { CommandBar } from './components/CommandBar';
+import { CategoryFilter } from './components/CategoryFilter';
 import { PageLightbox } from './components/PageLightbox';
 import { SelfCheckPanel } from './components/SelfCheckPanel';
-import { TreePanel } from './components/TreePanel';
 import './app.css';
 import './components/galaxy.css';
 
@@ -20,11 +20,11 @@ const Galaxy3D = lazy(() => import('./components/Galaxy3D').then((m) => ({ defau
 
 function Shell() {
   const { state, dispatch, docs } = useApp();
-  const [showTree, setShowTree] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [ingesting, setIngesting] = useState<string | null>(null);
   const [studioQueue, setStudioQueue] = useState<File[]>([]);
   const [checkDocIds, setCheckDocIds] = useState<string[]>([]);
+  const [catFilter, setCatFilter] = useState<string | null>(null);
   const inConversation = state.activeView.kind === 'conversation';
 
   const ingestFiles = useCallback(async (files: File[]) => {
@@ -60,12 +60,15 @@ function Shell() {
     void ingestFiles([...e.dataTransfer.files]);
   }, [ingestFiles]);
 
-  // Contextual recursion: the active conversation's scope recomposes the universe.
+  // Contextual recursion: the active conversation's scope recomposes the
+  // universe; outside a conversation the user's own category filter does.
   const scopeIds = useMemo(() => {
-    if (state.activeView.kind !== 'conversation') return null;
-    const conv = state.conversations.find((c) => state.activeView.kind === 'conversation' && c.id === state.activeView.id);
-    return conv ? scopeDocIds(docs, conv.device) : null;
-  }, [state.activeView, state.conversations, docs]);
+    if (state.activeView.kind === 'conversation') {
+      const conv = state.conversations.find((c) => state.activeView.kind === 'conversation' && c.id === state.activeView.id);
+      return conv ? scopeDocIds(docs, conv.device) : null;
+    }
+    return catFilter !== null ? categoryScope(docs, catFilter) : null;
+  }, [state.activeView, state.conversations, docs, catFilter]);
 
   // Global shortcuts: Ctrl+Shift+R = demo reset, Ctrl+Shift+D = driver toggle.
   useEffect(() => {
@@ -75,6 +78,7 @@ function Shell() {
         e.preventDefault();
         setWorkflowProfile('repair');
         installWorkspaceOps(TOOL_REGISTRY);
+        setCatFilter(null);
         dispatch({ type: 'demo-reset' });
       } else if (e.key.toLowerCase() === 'd') {
         e.preventDefault();
@@ -119,10 +123,8 @@ function Shell() {
 
         {!inConversation && !state.studioMode && (
           <>
-            <button className={`galaxy-tree-toggle btn ${showTree ? 'active' : ''}`} onClick={() => setShowTree(!showTree)}>
-              Knowledge tree
-            </button>
-            <label className="galaxy-add btn" title="Add manuals to the knowledge universe (or drop files anywhere)">
+            <label className="galaxy-add" title="Add manuals to the knowledge universe (or drop files anywhere)">
+              <span className="galaxy-add-plus mono">+</span>
               Add files
               <input
                 type="file"
@@ -132,11 +134,7 @@ function Shell() {
                 onChange={(e) => { if (e.target.files) void ingestFiles([...e.target.files]); e.target.value = ''; }}
               />
             </label>
-            {showTree && (
-              <div className="galaxy-tree-drawer fade-up">
-                <TreePanel />
-              </div>
-            )}
+            <CategoryFilter docs={docs} value={catFilter} onChange={setCatFilter} />
             <CommandBar />
           </>
         )}

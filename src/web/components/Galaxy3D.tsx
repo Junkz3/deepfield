@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import type { Document } from '../../agent/types';
 import { pageTitle } from '../../agent/taxonomy';
 import { useApp } from '../store';
+import { catColor } from '../cat-colors';
 import displayFont from '@fontsource/space-grotesk/files/space-grotesk-latin-500-normal.woff?url';
 
 const R = 2.75; // shell radius of the file planet
@@ -19,23 +20,6 @@ const R = 2.75; // shell radius of the file planet
 // injects itself, so the VR path can be exercised (and filmed) headset-free.
 // No synthetic room: our own deep space IS the environment.
 const xrStore = createXRStore({ emulate: { syntheticEnvironment: false } });
-
-const CAT_COLORS: Record<string, string> = {
-  'dishwasher': '#59c2ff',
-  'washing machine': '#6e9cff',
-  'vehicle': '#a3d977',
-  'smartphone': '#c792ea',
-  'game console': '#f07178',
-  'coffee machine': '#e6b455',
-};
-/** Fixed hues for the core categories; deterministic generated hues for the rest. */
-const catColor = (label: string) => {
-  const key = label.toLowerCase();
-  if (CAT_COLORS[key]) return CAT_COLORS[key];
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-  return `hsl(${h % 360}, ${62 + (h % 3) * 8}%, ${64 + (h % 4) * 4}%)`;
-};
 
 const rnd = (seed: number) => Math.sin(seed * 127.1 + 311.7) * 0.5 + Math.sin(seed * 74.7) * 0.5;
 
@@ -1687,7 +1671,9 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage, vrDraft, on
   // No AI description: just the page number, long doc names are noise.
   const vrTitle = (_n: FileNode, page: number, t?: string) =>
     !t || /manual page/i.test(t) ? `p.${page}` : t;
-  const scopeActive = panelOpen && scopeIds !== null && scopeIds.size < docs.length;
+  // Scope ghosting works for BOTH drivers of the channel: the conversation
+  // scope (panel open) and the user's category filter on the home universe.
+  const scopeActive = scopeIds !== null && scopeIds.size < docs.length;
   const inScope = (docId: string) => !scopeActive || (scopeIds?.has(docId) ?? true);
   // Where a doc LIVES right now: scoped files migrate into a tight working
   // system around the core; ghosts stay out on the full shell.

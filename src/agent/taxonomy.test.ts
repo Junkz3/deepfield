@@ -110,6 +110,21 @@ describe('trimPool', () => {
   });
 });
 
+describe('categoryScope (user filter)', () => {
+  it('returns exactly the docs of the requested category', async () => {
+    const { categoryScope } = await import('./taxonomy');
+    expect(categoryScope(CORPUS, 'dishwasher')).toEqual(new Set(['whirlpool-dw', 'lg-dw']));
+  });
+  it('returns an empty set for an unknown category', async () => {
+    const { categoryScope } = await import('./taxonomy');
+    expect(categoryScope(CORPUS, 'washing machine').size).toBe(0);
+  });
+  it('handles an empty corpus', async () => {
+    const { categoryScope } = await import('./taxonomy');
+    expect(categoryScope([], 'dishwasher').size).toBe(0);
+  });
+});
+
 describe('scopeDocIds (contextual recursion)', () => {
   it('scopes to matching docs and shares truth with candidatePages', async () => {
     const { scopeDocIds } = await import('./taxonomy');
