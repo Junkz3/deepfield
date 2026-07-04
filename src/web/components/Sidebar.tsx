@@ -1,4 +1,5 @@
 import { LANGS, langName, useApp } from '../store';
+import { VoiceToggle } from './VoiceToggle';
 import { setAgentLanguage } from '../../vultr/client';
 import './sidebar.css';
 
@@ -93,6 +94,7 @@ export function Sidebar() {
           </optgroup>
         </select>
       </div>
+      <VoiceToggle />
       <div className="sidebar-foot">
         <span className="chip" title="Ctrl+Shift+D toggles the driver">
           <span

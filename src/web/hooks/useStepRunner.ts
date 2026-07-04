@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react';
 import { runStep } from '../../agent/loop';
 import type { GuidedStep, Phase, PhaseEvent } from '../../agent/types';
 import { getDriver } from '../driver-factory';
+import { speakVerdict } from '../tts';
 import { useApp } from '../store';
 
 export interface LiveStep {
@@ -35,6 +36,8 @@ export function useStepRunner(conversationId: string) {
           const n = await gen.next();
           if (n.done) {
             dispatch({ type: 'append-step', conversationId, step: { ...n.value, userInput } });
+            // Spoken verdict: fire-and-forget, gated inside speakVerdict.
+            if (n.value.status !== 'error') void speakVerdict(n.value.instruction, state.lang, state.driverKind);
             break;
           }
           const e = n.value;
