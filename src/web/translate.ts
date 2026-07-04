@@ -1,4 +1,5 @@
-// Real-time translation layer. Nemotron reads the PAGE IMAGE and rewrites its
+// Real-time translation layer - ALL of it runs on NVIDIA Nemotron (the
+// hackathon's flagship reasoner). Nemotron reads the PAGE IMAGE and rewrites its
 // content in the technician's language (part numbers, codes and units kept
 // verbatim). Works on any page of the universe - scans included - because the
 // input is the image, not extracted text. Cached per (page, language).
@@ -48,7 +49,7 @@ export async function translatePage(
         { type: 'image_url', image_url: { url: await toDataUrl(imageUrl) } },
       ],
     }],
-    max_tokens: 4000,
+    max_tokens: 8000,
   });
   const out = r.choices?.[0]?.message?.content?.trim() ?? '';
   if (!out) {
@@ -94,17 +95,19 @@ export async function translateLines(
   } else {
     // Chunked so long pages never overflow the completion budget.
     const t = proxyTransport();
-    const CHUNK = 8;
+    const CHUNK = 5;
     out = [];
     for (let i = 0; i < lines.length; i += CHUNK) {
       const slice = lines.slice(i, i + CHUNK);
       const r = await t('/chat/completions', {
-        model: MODELS.kimi,
+        model: MODELS.omni,
         messages: [{
           role: 'user',
-          content: `Translate each line into ${langName(lang)}. Keep part numbers, codes and units verbatim. Return STRICT JSON: an array of ${slice.length} strings, same order, nothing else. Lines:\n${JSON.stringify(slice)}`,
+          content: `Translate each line into ${langName(lang)}. Keep part numbers, codes and units verbatim. This is mechanical translation: keep any internal reasoning under 20 words, then output ONLY a JSON array of ${slice.length} strings, same order. Lines:\n${JSON.stringify(slice)}`,
         }],
-        max_tokens: 2400,
+        // the endpoint grants roughly half the requested completion budget;
+        // reasoning eats from it before the JSON - ask big
+        max_tokens: 8000,
       });
       const text: string = r.choices?.[0]?.message?.content ?? '[]';
       try {
