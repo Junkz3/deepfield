@@ -1,6 +1,6 @@
 export type Phase = 'plan' | 'retrieve' | 'reason' | 'tools' | 'decide';
 export type StepStatus = 'ok' | 'needs-input' | 'no-evidence' | 'error' | 'done';
-export type PageKind = 'error-table' | 'schematic' | 'troubleshooting' | 'procedure' | 'parts' | 'safety' | 'video-segment' | 'other';
+export type PageKind = 'error-table' | 'schematic' | 'troubleshooting' | 'procedure' | 'parts' | 'safety' | 'coverage-table' | 'video-segment' | 'other';
 export type DocFormat = 'pdf' | 'image' | 'text' | 'video';
 export type DocType = 'service' | 'user' | 'schematic' | 'parts' | 'video';
 export type Origin = 'corpus' | 'session';

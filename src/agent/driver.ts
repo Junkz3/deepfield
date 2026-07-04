@@ -21,6 +21,12 @@ export interface ModelDriver {
   /** Free-form grounded answer (questions and deep dives) - optional; the
    *  loop falls back to the diagnosis pipeline when a driver lacks it. */
   answer?(question: string, evidence: Page[], mode: 'qa' | 'deep'): Promise<string>;
+  /** Tag freshly ingested pages with retrieval-boosting kinds (error-table,
+   *  coverage-table, ...) from their text - optional, batched, background. */
+  tagPages?(pages: { page: number; text?: string }[]): Promise<Record<number, PageKind>>;
+  /** Self-check: write ONE verifiable probe question from a page's text,
+   *  with literal values a correct answer must quote. */
+  generateProbe?(page: { page: number; text: string }): Promise<{ question: string; mustContain: string[] } | null>;
 }
 
 const BASE_MS = { plan: 2000, retrieve: 4000, assessSufficiency: 1500, diagnose: 6000, classify: 3000 } as const;
@@ -86,6 +92,27 @@ export class FakeDriver implements ModelDriver {
     }
     const flipped = evidence.length === 0; // loop passes [] after an in-spec measurement pivot
     return flipped ? E3_FLIPPED_DIAGNOSIS : E3_DIAGNOSIS;
+  }
+
+  async generateProbe(page: { page: number; text: string }): Promise<{ question: string; mustContain: string[] } | null> {
+    await this.pace('assessSufficiency');
+    const value = page.text.match(/[$£€]\s?\d+(?:[.,]\d+)?|\d+\s?:\s?\d+|\d+(?:[.,]\d+)?\s?(?:%|mm|V|A|W)/)?.[0];
+    if (!value) return null;
+    return { question: `What value does this document specify around page ${page.page}?`, mustContain: [value] };
+  }
+
+  async tagPages(pages: { page: number; text?: string }[]): Promise<Record<number, PageKind>> {
+    await this.pace('assessSufficiency');
+    const out: Record<number, PageKind> = {};
+    for (const p of pages) {
+      const t = (p.text ?? '').toLowerCase();
+      if (/error code|fault code|code d'erreur/.test(t)) out[p.page] = 'error-table';
+      else if (/troubleshoot|problem.*solution|dépannage/.test(t)) out[p.page] = 'troubleshooting';
+      else if (/wiring|schematic|circuit diagram/.test(t)) out[p.page] = 'schematic';
+      else if (/what('| i)s covered|we will (not )?cover|exclusions|sum insured/.test(t)) out[p.page] = 'coverage-table';
+      else if (/warning|safety|caution/.test(t)) out[p.page] = 'safety';
+    }
+    return out;
   }
 
   async classify(input: ClassifyInput): Promise<DocMeta> {

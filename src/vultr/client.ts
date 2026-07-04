@@ -1,5 +1,5 @@
 import type { ClassifyInput, DocMeta, ModelDriver, SufficiencyVerdict } from '../agent/driver';
-import type { Diagnosis, Page, PlanAction, ScoredPage } from '../agent/types';
+import type { Diagnosis, Page, PageKind, PlanAction, ScoredPage } from '../agent/types';
 import { workflowProfile } from '../agent/workflow';
 
 export type Transport = (path: string, body: unknown) => Promise<any>;
@@ -209,6 +209,30 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
       if (d !== fallback) return d;
     }
     return fallback;
+  }
+
+  async generateProbe(page: { page: number; text: string }): Promise<{ question: string; mustContain: string[] } | null> {
+    if (page.text.trim().length < 120) return null;
+    const text = await chatText(this.t, MODELS.omni,
+      `You are auditing a document-grounded assistant. Here is the text of page ${page.page}:\n"${page.text.slice(0, 900)}"\nWrite ONE question a real user of this document would naturally ask, whose answer is verifiably printed in this text. Do NOT mention the page or the document in the question. Return STRICT JSON: {"question": string (in ${AGENT_LANG}), "mustContain": [2-3 short LITERAL values or terms copied VERBATIM from the text that any correct answer must contain - prefer amounts, ratios, codes, defined names]}. Do not deliberate: at most 20 words of internal reasoning, then ONLY the JSON.`, 8000);
+    const v = extractJson<{ question: string; mustContain: string[] }>(text, { question: '', mustContain: [] });
+    if (!v.question || !Array.isArray(v.mustContain) || v.mustContain.length === 0) return null;
+    return { question: v.question, mustContain: v.mustContain.map(String) };
+  }
+
+  async tagPages(pages: { page: number; text?: string }[]): Promise<Record<number, PageKind>> {
+    const withText = pages.filter((p) => (p.text ?? '').trim().length > 40);
+    if (withText.length === 0) return {};
+    const listing = withText.map((p) => `p.${p.page}: "${(p.text ?? '').slice(0, 200).replace(/\n+/g, ' ')}"`).join('\n');
+    const text = await chatText(this.t, MODELS.omni,
+      `You are ${workflowProfile().agentRole} indexing a document for retrieval. For each page snippet below, pick the page's function.\n${listing}\nAllowed values: "error-table" (fault/error-code listing), "troubleshooting" (symptom-to-fix procedures), "schematic" (wiring/diagrams), "procedure" (step-by-step instructions), "parts" (part lists), "safety" (warnings), "coverage-table" (what is covered/excluded, limits, deductibles), "other" (covers, TOC, prose). Most pages are "other" - only tag a page when its snippet clearly shows the function. Do NOT deliberate: at most 20 words of internal reasoning, then output ONLY a JSON object mapping page numbers to values, e.g. {"12":"error-table","30":"other"}.`, 8000);
+    const raw = extractJson<Record<string, string>>(text, {});
+    const allowed = new Set(['error-table', 'troubleshooting', 'schematic', 'procedure', 'parts', 'safety', 'coverage-table']);
+    const out: Record<number, PageKind> = {};
+    for (const [k, v] of Object.entries(raw)) {
+      if (allowed.has(v)) out[Number(k)] = v as PageKind;
+    }
+    return out;
   }
 
   async classify(input: ClassifyInput): Promise<DocMeta> {

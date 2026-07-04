@@ -37,6 +37,45 @@ async function readAsDataUrl(file: File): Promise<string> {
   });
 }
 
+/** Full-depth background ingestion: after the fast 3-page classify pass, the
+ *  REST of the PDF renders batch by batch and joins the document live. This
+ *  is what makes a dropped 88-page policy as searchable as a built corpus.
+ *  Each batch is kind-tagged (retrieval boost) when the driver supports it. */
+export async function deepenDocument(
+  file: File,
+  doc: Document,
+  driver: ModelDriver,
+  onPages: (docId: string, pages: Page[]) => void,
+  opts?: { maxPages?: number; batch?: number },
+): Promise<void> {
+  if (!(file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))) return;
+  const cap = opts?.maxPages ?? 120;
+  const batchSize = opts?.batch ?? 8;
+  const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+  const last = Math.min(pdf.numPages, cap);
+  for (let start = doc.pages.length + 1; start <= last; start += batchSize) {
+    const end = Math.min(start + batchSize - 1, last);
+    const batch: Page[] = [];
+    for (let i = start; i <= end; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 1000 / page.getViewport({ scale: 1 }).width });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvasContext: canvas.getContext('2d')!, viewport } as any).promise;
+      const text = (await page.getTextContent()).items.map((it: any) => it.str ?? '').join(' ');
+      batch.push({ docId: doc.id, page: i, imageUrl: canvas.toDataURL('image/png'), text: text.slice(0, 600) || undefined, kind: 'other' });
+    }
+    if (driver.tagPages) {
+      try {
+        const kinds = await driver.tagPages(batch.map((p) => ({ page: p.page, text: p.text })));
+        for (const p of batch) if (kinds[p.page]) p.kind = kinds[p.page];
+      } catch { /* tags are a boost, never a blocker */ }
+    }
+    onPages(doc.id, batch);
+  }
+}
+
 export async function ingestFile(file: File, driver: ModelDriver): Promise<Document> {
   let pageImages: string[] = [];
   let pageTexts: (string | undefined)[] = [];

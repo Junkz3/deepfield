@@ -8,6 +8,7 @@ export const KIND_TITLES: Record<PageKind, string> = {
   'procedure': 'Repair procedure',
   'parts': 'Parts list',
   'safety': 'Safety notices',
+  'coverage-table': 'Coverage table',
   'video-segment': 'Video segment',
   'other': 'Manual page',
 };
