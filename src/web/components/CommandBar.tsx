@@ -84,7 +84,11 @@ export function CommandBar() {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
         />
-        <VoiceInput lang={state.lang} onText={(t) => setText((prev) => (prev ? `${prev} ${t}` : t))} />
+        <VoiceInput
+          lang={state.lang}
+          onText={(t) => setText((prev) => (prev ? `${prev} ${t}` : t))}
+          onSubmit={(t) => { const { device, symptom } = parse(t); launch(device, symptom); }}
+        />
         <button className="cmdbar-go" onClick={submit} disabled={!text.trim()} title="Start">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M5 12h14M13 6l6 6-6 6" />

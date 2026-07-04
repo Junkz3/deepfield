@@ -35,3 +35,15 @@
   text-align: right;
   letter-spacing: 0.08em;
 }
+
+/* Keycap hint for the walkie-talkie shortcut. */
+.voice-key {
+  font-size: 10px;
+  color: var(--text-faint);
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 5px;
+  letter-spacing: 0.08em;
+  user-select: none;
+}
