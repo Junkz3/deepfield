@@ -74,15 +74,20 @@ for (const v of manifest.videos ?? []) {
     docType: 'video',
     sourceRights: v.sourceRights,
     origin: 'corpus',
-    pages: chapters.map((c, i) => ({
-      docId: v.id,
-      page: i + 1,
-      imageUrl: thumb,
-      text: c.title,
-      kind: 'video-segment' as PageKind,
-      timestamp: c.timestamp,
-      videoUrl: v.url,
-    })),
+    pages: chapters.map((c, i) => {
+      const frame = `/corpus/${v.id}/seg${i + 1}.jpg`;
+      const hasFrame = existsSync(join(ROOT, 'public', frame.slice(1)));
+      return {
+        docId: v.id,
+        page: i + 1,
+        imageUrl: hasFrame ? frame : thumb,
+        text: c.title,
+        title: c.title,
+        kind: 'video-segment' as PageKind,
+        timestamp: c.timestamp,
+        videoUrl: v.url,
+      };
+    }),
   });
   console.log(`${v.id}: ${chapters.length} segments`);
 }

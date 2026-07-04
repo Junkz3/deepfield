@@ -8,6 +8,7 @@ import { Billboard, Line, OrbitControls, Text } from '@react-three/drei';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { Document } from '../../agent/types';
+import { pageTitle } from '../../agent/taxonomy';
 import { useApp } from '../store';
 import displayFont from '@fontsource/space-grotesk/files/space-grotesk-latin-500-normal.woff?url';
 
@@ -476,8 +477,8 @@ function FileCard({ node, targetPos, ghost, isHit, hitCount, onHover, onSelect }
 
 /* ---------- the agent reads: real manual pages fan out in space ---------- */
 
-function FloatingPage({ url, label, index, total, anchor, color, onClick }: {
-  url: string; label?: string; index: number; total: number; anchor: THREE.Vector3; color: string; onClick: () => void;
+function FloatingPage({ url, label, title, index, total, anchor, color, onClick }: {
+  url: string; label?: string; title?: string; index: number; total: number; anchor: THREE.Vector3; color: string; onClick: () => void;
 }) {
   const [tex, setTex] = useState<THREE.Texture | null>(null);
   const group = useRef<THREE.Group>(null);
@@ -526,6 +527,11 @@ function FloatingPage({ url, label, index, total, anchor, color, onClick }: {
         {label && (
           <Text font={displayFont} position={[0, -0.44, 0]} fontSize={0.1} color="#ffc678" anchorX="center" outlineWidth={0.006} outlineColor="#080b10">
             {label}
+          </Text>
+        )}
+        {title && (
+          <Text font={displayFont} position={[0, label ? -0.55 : -0.44, 0]} fontSize={0.062} color="#93a3b3" anchorX="center" outlineWidth={0.004} outlineColor="#080b10" maxWidth={0.9} textAlign="center">
+            {title}
           </Text>
         )}
       </Billboard>
@@ -647,7 +653,7 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
         const pg = focusNode.doc.pages.find((p) => p.page === page);
         const ts = pg?.timestamp;
         const label = ts !== undefined ? `${Math.floor(ts / 60)}:${String(ts % 60).padStart(2, '0')}` : undefined;
-        return { page, url: pg?.imageUrl ?? '', label };
+        return { page, url: pg?.imageUrl ?? '', label, title: pg ? pageTitle(pg) : undefined };
       })
       .filter((p) => p.url);
   }, [focusNode, hitByDoc]);
@@ -695,6 +701,7 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
           key={`${focusNode.doc.id}-${p.page}`}
           url={p.url}
           label={p.label}
+          title={p.title}
           index={i}
           total={floatingPages.length}
           anchor={livePos(focusNode)}

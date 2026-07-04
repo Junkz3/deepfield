@@ -563,3 +563,15 @@
 }
 .lightbox-chapter:hover { color: var(--text); }
 .lightbox-chapter.active { border-color: var(--accent); color: var(--accent-strong); }
+
+.cite-chip { max-width: 100%; }
+.cite-chip-loc { color: var(--info); }
+.cite-chip-title {
+  color: var(--text-dim);
+  font-family: var(--font-ui);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+.cite-chip:hover .cite-chip-title { color: var(--text); }

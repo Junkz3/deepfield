@@ -26,11 +26,13 @@ function CiteChips({ citations, onOpen }: { citations: Citation[]; onOpen: (c: C
   return (
     <div className="cite-chips">
       {citations.map((c, i) => (
-        <button key={i} className="cite-chip mono" onClick={() => onOpen(c)} title={c.quote ?? c.label}>
-          {c.timestamp !== undefined
-            ? `@ ${Math.floor(c.timestamp / 60)}:${String(c.timestamp % 60).padStart(2, '0')}`
-            : `p.${c.page}`}
-          <span className="cite-chip-kind">{c.label.match(/\(([^)]+)\)/)?.[1] ?? ''}</span>
+        <button key={i} className="cite-chip" onClick={() => onOpen(c)} title={c.quote ?? c.label}>
+          <span className="mono cite-chip-loc">
+            {c.timestamp !== undefined
+              ? `@ ${Math.floor(c.timestamp / 60)}:${String(c.timestamp % 60).padStart(2, '0')}`
+              : `p.${c.page}`}
+          </span>
+          <span className="cite-chip-title">{c.title ?? c.label}</span>
         </button>
       ))}
     </div>

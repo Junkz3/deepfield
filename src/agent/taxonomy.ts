@@ -1,4 +1,20 @@
-import type { Document, Page, TaxonomyNode } from './types';
+import type { Document, Page, PageKind, TaxonomyNode } from './types';
+
+/** Human-readable purpose of a page, shown before the user opens it. */
+export const KIND_TITLES: Record<PageKind, string> = {
+  'error-table': 'Error-code table',
+  'schematic': 'Wiring diagram',
+  'troubleshooting': 'Troubleshooting guide',
+  'procedure': 'Repair procedure',
+  'parts': 'Parts list',
+  'safety': 'Safety notices',
+  'video-segment': 'Video segment',
+  'other': 'Manual page',
+};
+
+export function pageTitle(p: Page): string {
+  return p.title ?? (p.kind === 'video-segment' && p.text ? p.text : KIND_TITLES[p.kind]);
+}
 
 export interface GalaxyNode { id: string; type: TaxonomyNode['type']; label: string; x: number; y: number; r: number; parentId?: string; docId?: string; page?: number; categoryIndex: number }
 export interface GalaxyLayout { nodes: GalaxyNode[]; edges: { from: string; to: string }[] }

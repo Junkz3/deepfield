@@ -1,6 +1,6 @@
 import type { Conversation, Diagnosis, Document, GuidedStep, PartLine, PhaseEvent, SafetyInfo, ScoredPage, WorkOrder } from './types';
 import type { ModelDriver } from './driver';
-import { candidatePages } from './taxonomy';
+import { candidatePages, pageTitle } from './taxonomy';
 import { checkMeasurement, checkSafety, getPart } from './tools';
 import { computeConfidence, workOrderConfidence } from './confidence';
 
@@ -15,6 +15,7 @@ const toCitation = (s: ScoredPage) => ({
   docId: s.page.docId, page: s.page.page, region: s.page.region,
   quote: s.page.text?.slice(0, 120), timestamp: s.page.timestamp,
   label: `${s.page.docId} p.${s.page.page} (${s.page.kind})`,
+  title: pageTitle(s.page),
 });
 
 export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGenerator<PhaseEvent, GuidedStep> {
