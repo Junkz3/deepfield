@@ -111,12 +111,17 @@ export class FakeDriver implements ModelDriver {
         ],
       };
     }
-    // The offline script requests its ops like the live model would.
+    // The offline script requests its ops and writes its follow-ups like
+    // the live model would.
     return {
       ...E3_DIAGNOSIS,
       tools: [
         { id: 'part_lookup', args: { component: 'heating element' } },
         { id: 'safety_notes', args: { operation: 'replace heating element' } },
+      ],
+      followups: [
+        'I measured the heating element at 14 ohms',
+        'How do I access the heating element?',
       ],
     };
   }

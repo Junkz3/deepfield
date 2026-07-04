@@ -222,12 +222,21 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
     // it), so the gate is the decision mode itself: calibrated diagnostic
     // workspaces get their ops even without the physical-tools flag.
     const ops = workflowProfile().decisionMode === 'diagnosis' ? activeTools() : [];
-    const basePrompt = (withOps: boolean) => {
+    // Inline sourcing rides the FIRST attempt only, like the op offer: the
+    // model can only cite page numbers it was given, and the fallback rungs
+    // must stay the exact prompt the fragile cases passed on.
+    const basePrompt = (withOps: boolean, withPages = false) => {
       const opsSection = withOps ? opsPromptSection(ops) : '';
+      const pagesLine = withPages && evidence.length > 0
+        ? ` Attached pages, in this order: ${evidence.slice(0, 4).map((p) => `p.${p.page}`).join(', ')}. After the cause and after EACH check, cite its source page in parentheses like (p.${evidence[0].page}) - only pages from this list.`
+        : '';
       const jsonTools = withOps && ops.length > 0 ? ', "tools": []' : '';
-      return `You are ${workflowProfile().agentRole} producing a grounded verdict. ${workflowProfile().subjectNoun}: ${q.device}. ${workflowProfile().issueNoun}: ${q.symptom}.\nGround yourself ONLY in the attached manual pages${techPhoto ? ' and the technician photo (last image)' : ''}. Return STRICT JSON: {"component": string, "cause": string, "checks": [string, string, string], "instruction": string, "componentKey": "heater"|"thermistor"|"sensor"|"pump"|"motor"|"board"|"wiring"|"other"${jsonTools}} - checks must be concrete ACTIONS the technician performs (measure X, inspect Y), ordered, with measurable values when the pages give them; instruction = one or two sentences guiding the technician: the FIRST concrete action with its expected measurable value from the pages, then what the result decides next; varied phrasing, no boilerplate prefix. Write component/cause/checks in ${AGENT_LANG}; keep part numbers and error codes verbatim.${opsSection} If a page gives a STEP-BY-STEP troubleshooting procedure with several candidate causes for this exact malfunction, that IS a valid diagnosis: component = the target of the procedure's first step, cause = the malfunction line as printed, checks = the procedure's first steps in their printed order (cite the paragraph numbers). Only set component to "insufficient evidence" when no retained page addresses the symptom at all. Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.`;
+      const jsonFollowups = withPages
+        ? ', "followups": [2 SHORT messages the user would naturally send next (a finding to report, a deeper question), first person, in ' + AGENT_LANG + ']'
+        : '';
+      return `You are ${workflowProfile().agentRole} producing a grounded verdict. ${workflowProfile().subjectNoun}: ${q.device}. ${workflowProfile().issueNoun}: ${q.symptom}.\nGround yourself ONLY in the attached manual pages${techPhoto ? ' and the technician photo (last image)' : ''}. Return STRICT JSON: {"component": string, "cause": string, "checks": [string, string, string], "instruction": string, "componentKey": "heater"|"thermistor"|"sensor"|"pump"|"motor"|"board"|"wiring"|"other"${jsonTools}${jsonFollowups}} - checks must be concrete ACTIONS the technician performs (measure X, inspect Y), ordered, with measurable values when the pages give them; instruction = one or two sentences guiding the technician: the FIRST concrete action with its expected measurable value from the pages, then what the result decides next; varied phrasing, no boilerplate prefix. Write component/cause/checks in ${AGENT_LANG}; keep part numbers and error codes verbatim.${opsSection}${pagesLine} If a page gives a STEP-BY-STEP troubleshooting procedure with several candidate causes for this exact malfunction, that IS a valid diagnosis: component = the target of the procedure's first step, cause = the malfunction line as printed, checks = the procedure's first steps in their printed order (cite the paragraph numbers). Only set component to "insufficient evidence" when no retained page addresses the symptom at all. Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.`;
     };
-    const parts: unknown[] = [{ type: 'text', text: basePrompt(true) }];
+    const parts: unknown[] = [{ type: 'text', text: basePrompt(true, true) }];
     for (const p of evidence.slice(0, 4)) parts.push({ type: 'image_url', image_url: { url: await toDataUrl(p.imageUrl) } });
     const fallback: Diagnosis = {
       component: 'insufficient evidence',
@@ -251,15 +260,15 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
     // the cap 3/3 with ops anywhere in the prompt). Attempt 2 is the exact
     // pre-registry prompt - the setup those cases passed on - then the
     // strict/shedding retries for the two cap-burn regimes.
-    const ladder: { withOps: boolean; strict: boolean; take: number }[] = [
-      { withOps: true, strict: false, take: 4 },
-      ...(ops.length > 0 ? [{ withOps: false, strict: false, take: 4 }] : []),
-      { withOps: false, strict: true, take: 4 },
-      { withOps: false, strict: true, take: 2 },
-      { withOps: false, strict: true, take: 1 },
+    const ladder: { withOps: boolean; withPages: boolean; strict: boolean; take: number }[] = [
+      { withOps: true, withPages: true, strict: false, take: 4 },
+      ...(ops.length > 0 ? [{ withOps: false, withPages: false, strict: false, take: 4 }] : []),
+      { withOps: false, withPages: false, strict: true, take: 4 },
+      { withOps: false, withPages: false, strict: true, take: 2 },
+      { withOps: false, withPages: false, strict: true, take: 1 },
     ];
     for (const step of ladder) {
-      const base = basePrompt(step.withOps);
+      const base = basePrompt(step.withOps, step.withPages);
       const head = {
         type: 'text',
         text: step.strict

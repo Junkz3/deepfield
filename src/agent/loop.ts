@@ -267,13 +267,28 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     new Set(retrieved.map((r) => r.page.docId)).size,
     new Set(retrieved.map((r) => r.page.kind)).size,
   );
-  const conf = computeConfidence({ exactCodeMatch, corroboratingCitations: distinctSources - 1, requiredPageMissing: evidenceIncomplete });
+  // The sufficiency judge reads text SNIPPETS and keeps doubting pages whose
+  // snippet cuts off before the answer (measured: it re-asked for an
+  // error-code table it had RETAINED since round one). When the exact code
+  // is literally in the retained evidence and a full verdict came out, that
+  // doubt is refuted by the facts - no missing-page penalty.
+  const conf = computeConfidence({ exactCodeMatch, corroboratingCitations: distinctSources - 1, requiredPageMissing: evidenceIncomplete && !exactCodeMatch });
   yield emit({ phase: 'decide', summary: `First check: ${diagnosis.checks[0] ?? diagnosis.instruction ?? 'see cited pages'}` });
 
-  // Proposed actions follow the DIAGNOSIS, not a fixed script. Measurements
-  // are typed into the open reply (real values, not pre-filled buttons).
+  // Proposed actions follow the DIAGNOSIS, not a fixed script. The model
+  // writes the contextual follow-ups inside its verdict (what the user
+  // would naturally send next); they feed the open-reply flow. Measurements
+  // are typed as real values, never pre-filled buttons.
   const proposedNext: { label: string; action: string }[] = [];
-  const hasVideo = candidates.some((p) => p.kind === 'video-segment');
+  for (const f of (diagnosis.followups ?? []).slice(0, 2)) {
+    const t = String(f).trim();
+    if (t.length > 3) proposedNext.push({ label: t, action: `ask:${t}` });
+  }
+  // Offer the video only when its segments actually cover the diagnosed
+  // component - a walkthrough for another part is worse than no button.
+  const compTokens = `${diagnosis.componentKey ?? ''} ${diagnosis.component}`.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 3);
+  const hasVideo = candidates.some((p) => p.kind === 'video-segment'
+    && compTokens.some((t) => `${p.docId} ${p.title ?? ''} ${p.text ?? ''}`.toLowerCase().includes(t)));
   if (hasVideo) proposedNext.push({ label: 'Show me the replacement video', action: 'find-video' });
   if (citations.length > 1) proposedNext.push({ label: 'Show the corroborating page', action: 'show-citation:1' });
   proposedNext.push({ label: 'Explain in depth', action: 'explain-deep' });
@@ -283,9 +298,12 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     index: conversation.steps.length, phaseEvents: events, agentLabel,
     instruction: diagnosis.instruction ?? `${diagnosis.cause} First: ${diagnosis.checks[0]}.`,
     citations,
-    proposedNext: proposedNext.slice(0, 5),
+    proposedNext: proposedNext.slice(0, 6),
     confidence: conf.value, confidenceReason: conf.reason, status: 'ok',
     diagnosis,
+    // The pages the verdict was actually read from (diagnose sees the first
+    // four): engine-guaranteed sourcing, whatever the model chose to cite.
+    readPages: evidenceOrder.slice(0, 4).map((r) => ({ docId: r.page.docId, page: r.page.page })),
   };
 }
 

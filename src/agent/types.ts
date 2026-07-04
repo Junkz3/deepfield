@@ -11,12 +11,12 @@ export interface Document { id: string; filename: string; format: DocFormat; cat
 export interface Citation { docId: string; page: number; region?: Region; quote?: string; timestamp?: number; label: string; title?: string }
 export interface ScoredPage { page: Page; score: number }
 export interface PlanAction { goal: string; queries: string[]; intent?: 'diagnose' | 'question'; agentId?: string }
-export interface Diagnosis { component: string; cause: string; checks: string[]; instruction?: string; componentKey?: string; tools?: { id: string; args?: Record<string, string> }[] }
+export interface Diagnosis { component: string; cause: string; checks: string[]; instruction?: string; componentKey?: string; tools?: { id: string; args?: Record<string, string> }[]; followups?: string[] }
 export interface PartLine { ref: string; name: string; inStock: boolean; price?: number; leadDays?: number }
 export interface SafetyInfo { lines: string[]; citations: Citation[] }
 export interface PhaseEvent { phase: Phase; summary: string; detail?: string; citations?: Citation[]; hitPages?: { docId: string; page: number }[] }
 export interface ProposedAction { label: string; action: string }
-export interface GuidedStep { index: number; phaseEvents: PhaseEvent[]; instruction: string; citations: Citation[]; proposedNext: ProposedAction[]; confidence: number; confidenceReason: string; status: StepStatus; diagnosis?: Diagnosis; parts?: PartLine[]; safety?: SafetyInfo; userInput?: string; answer?: string; agentLabel?: string }
+export interface GuidedStep { index: number; phaseEvents: PhaseEvent[]; instruction: string; citations: Citation[]; proposedNext: ProposedAction[]; confidence: number; confidenceReason: string; status: StepStatus; diagnosis?: Diagnosis; parts?: PartLine[]; safety?: SafetyInfo; userInput?: string; answer?: string; agentLabel?: string; readPages?: { docId: string; page: number }[] }
 export interface Attachment { kind: 'image'; dataUrl: string; name: string }
 export interface Conversation { id: string; device: string; symptom: string; attachments: Attachment[]; steps: GuidedStep[]; userInputs: string[]; status: 'active' | 'closed' }
 export interface WorkOrder { device: string; symptom: string; diagnosis: Diagnosis; procedure: string[]; parts: PartLine[]; safety: string[]; citations: Citation[]; missingDocs: string[]; confidence: number; confidenceReason: string }
