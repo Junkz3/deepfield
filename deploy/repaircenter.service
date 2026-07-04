@@ -1,0 +1,15 @@
+[Unit]
+Description=RepairCenter (static app + Vultr inference proxy)
+After=network.target
+
+[Service]
+Type=simple
+User=repaircenter
+WorkingDirectory=/opt/repaircenter
+EnvironmentFile=/opt/repaircenter/.env
+ExecStart=/usr/bin/node deploy/server.mjs
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
