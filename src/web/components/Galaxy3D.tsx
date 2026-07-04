@@ -538,27 +538,22 @@ function FloatingPage({ url, label, title, index, total, anchor, color, onClick 
   const target = useMemo(() => {
     const up = anchor.clone().normalize();
     const side = new THREE.Vector3().crossVectors(up, new THREE.Vector3(0, 1, 0)).normalize();
-    const gap = total > 4 ? 0.46 : 0.56; // tighten the fan when the agent pulled many pages
-    const spread = (index - (total - 1) / 2) * gap;
+    // Arrival-order slots alternate around the doc (0, +1, -1, +2, ...): a
+    // card that is already placed NEVER moves when later citations arrive.
+    const spread = (index % 2 === 0 ? 1 : -1) * Math.ceil(index / 2) * 0.6;
     return anchor.clone()
-      .addScaledVector(up, 0.75 + Math.abs(spread) * 0.08)
+      .addScaledVector(up, 0.78 + Math.abs(spread) * 0.08)
       .addScaledVector(side, spread);
-  }, [anchor, index, total]);
+  }, [anchor, index]);
 
-  useFrame(({ clock }, dt) => {
+  useFrame(({ clock }) => {
     if (!group.current) return;
     if (born.current === 0) born.current = clock.elapsedTime;
-    const age = clock.elapsedTime - born.current;
-    const k = Math.min(age / 0.55, 1);
-    const ease = 1 - Math.pow(1 - k, 3);
-    if (k < 1) {
-      group.current.position.lerpVectors(anchor, target, ease);
-    } else {
-      // target moves when later retrieves widen the fan: glide, don't snap
-      group.current.position.lerp(target, Math.min(dt * 4, 1));
-    }
-    group.current.position.y += Math.sin(clock.elapsedTime * 1.4 + index * 2) * 0.02;
-    group.current.scale.setScalar(0.25 + ease * 0.75);
+    const k = Math.min((clock.elapsedTime - born.current) / 0.25, 1);
+    // No travel, no bobbing, no re-centering: the card pops in AT its slot
+    // (quick scale-in) and then holds perfectly still. Frozen-world rule.
+    group.current.position.copy(target);
+    group.current.scale.setScalar(0.86 + (1 - Math.pow(1 - k, 3)) * 0.14);
   });
 
   if (!tex) return null;
