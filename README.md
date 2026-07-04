@@ -89,3 +89,27 @@ scripts/        corpus ingest (pdftoppm, pdftotext -bbox, yt-dlp chapters, ffmpe
 
 The whole agent runs through one seam (`ModelDriver`): a scripted offline driver for
 deterministic tests and demos, and the live Vultr driver. Same loop, same UI, same events.
+
+## Path to production
+
+The engine is already shaped for multi-tenant deployment: everything that defines a
+workspace (agent team, workspace operations, corpus manifest) is plain serializable data,
+and the whole agent sits behind two seams (`ModelDriver` for inference, one `docs.json`
+fetch for the corpus). Making it enterprise-ready is perimeter work, not a rewrite:
+
+- **Identity and organizations.** An IdP (Keycloak self-hosted, or WorkOS for SSO/SAML)
+  with organizations owning workspaces and role-based membership (admin, technician,
+  viewer). Workspaces belong to the organization, so a calibrated team is shared knowledge.
+- **Database: Vultr Managed PostgreSQL.** The schema is already drawn by the code:
+  `workspaces(id, org_id, name, team JSONB, ops JSONB)` is the in-app `WorkspaceSnapshot`,
+  conversations persist their steps with the full reasoning timeline (a structured audit
+  trail for free), plus documents, pages and work orders.
+- **Files and corpora: Vultr Object Storage.** One prefix per workspace: originals,
+  rendered pages, manifests. The in-browser ingestion pipeline (render, classify, tag,
+  background deepening) moves to a server worker unchanged in logic.
+- **Quotas and limits.** Per-user upload quota (the app already enforces 100 MB per user),
+  per-organization inference rate limits, and the existing API proxy allowlist. The
+  inference key never reaches a browser today and never would.
+
+Estimated at two to four weeks for a first multi-tenant MVP, with the agent loop itself
+untouched.
