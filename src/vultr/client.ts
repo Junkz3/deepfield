@@ -115,7 +115,12 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
       const head = i === 0 ? parts[0]
         : { type: 'text', text: `YOUR PREVIOUS ATTEMPT WAS CUT BY THE TOKEN CAP BEFORE ANY OUTPUT. Do NOT deliberate: at most 20 words of internal reasoning, then write the answer immediately.\n${(parts[0] as { text: string }).text}` };
       const attempt = [head, ...parts.slice(1, 1 + take)];
-      const text = (await chatText(this.t, MODELS.omni, attempt, 8000)).trim();
+      let text: string;
+      try {
+        text = (await chatText(this.t, MODELS.omni, attempt, 8000)).trim();
+      } catch {
+        continue; // gateway timeout or transient 5xx = a lost attempt, not a dead step: next rung
+      }
       if (text) return text;
     }
     return 'The pages could not be read into an answer - try rephrasing the question.';
@@ -226,12 +231,18 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
       cause: 'The retrieved pages did not yield a grounded diagnosis.',
       checks: ['Describe the symptom more specifically', 'Open the cited pages and check them manually'],
     };
-    // Two failure regimes burn the ~4000-token server cap before any JSON:
-    // DENSE pages (three military-TM pages: cap burned, zero content; one
-    // page: 7s, perfect) and RUMINATION on sparse evidence (measured: the
-    // SAME sewing case answers in 16s with 4 pages, burns the cap with 1-2 -
-    // less context means MORE deliberation). So retry first with a hard
-    // brevity directive at full context, then shed pages for density.
+    // The server grants HALF the requested max_tokens (measured sweep:
+    // 4000->2000, 8000->4000, 16000->8000). Asking 16000 for a real 8000
+    // budget DOES work - but a full rumination run then generates for 60s+
+    // and dies on the nginx gateway timeout instead (504 measured on the
+    // suite). The generation-time ceiling makes ~4000 real tokens the
+    // usable budget, so we stay at 8000. Two failure regimes burn it
+    // before any JSON: DENSE pages (three military-TM pages: cap burned,
+    // zero content; one page: 7s, perfect) and RUMINATION on sparse
+    // evidence (measured: the SAME sewing case answers in 16s with 4
+    // pages, burns the cap with 1-2 - less context means MORE
+    // deliberation). So retry first with a hard brevity directive at full
+    // context, then shed pages for density.
     // Attempt ladder. The op offer only rides the FIRST attempt: on sparse
     // evidence it re-feeds the rumination regime (measured: sewing burned
     // the cap 3/3 with ops anywhere in the prompt). Attempt 2 is the exact
@@ -254,7 +265,12 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
       };
       const attempt = [head, ...parts.slice(1, 1 + Math.min(step.take, evidence.length))];
       if (techPhoto) attempt.push({ type: 'image_url', image_url: { url: techPhoto } });
-      const text = await chatText(this.t, MODELS.omni, attempt, 8000);
+      let text: string;
+      try {
+        text = await chatText(this.t, MODELS.omni, attempt, 8000);
+      } catch {
+        continue; // gateway timeout or transient 5xx = a lost attempt, not a dead step: next rung
+      }
       const d = extractJson<Diagnosis>(text, fallback);
       if (d !== fallback) return d;
     }
@@ -309,7 +325,12 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
     for (const [i, take] of [3, 3, 1].entries()) {
       const head = i === 0 ? basePrompt
         : `YOUR PREVIOUS ATTEMPT WAS CUT BY THE TOKEN CAP BEFORE ANY OUTPUT. Do NOT deliberate: at most 20 words of internal reasoning, then the JSON object immediately.\n${basePrompt}`;
-      const text = await chatText(this.t, MODELS.omni, [{ type: 'text', text: head }, ...images.slice(0, take)], 8000);
+      let text: string;
+      try {
+        text = await chatText(this.t, MODELS.omni, [{ type: 'text', text: head }, ...images.slice(0, take)], 8000);
+      } catch {
+        continue; // gateway timeout or transient 5xx = a lost attempt, not a dead step: next rung
+      }
       const meta = extractJson<DocMeta>(text, fallback);
       if (meta !== fallback) {
         meta.pageKinds = input.pageImages.map(() => 'other');
