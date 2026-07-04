@@ -2,24 +2,8 @@ import { useEffect } from 'react';
 import { AppProvider, useApp } from './store';
 import { Sidebar } from './components/Sidebar';
 import { ConversationView } from './components/ConversationView';
-import { NewConversation } from './components/NewConversation';
+import { GalaxyView } from './components/GalaxyView';
 import './app.css';
-
-function CenterView() {
-  const { docs } = useApp();
-  return (
-    <section className="center-view fade-up">
-      <div className="view-placeholder" style={{ flex: 1 }}>
-        <h1>Repair Center</h1>
-        <p className="mono">{docs.length} documents in the knowledge base</p>
-        <p>The knowledge galaxy renders here.</p>
-      </div>
-      <div className="center-newconv">
-        <NewConversation />
-      </div>
-    </section>
-  );
-}
 
 function Shell() {
   const { state, dispatch } = useApp();
@@ -45,7 +29,7 @@ function Shell() {
       <Sidebar />
       <main className="main">
         {state.activeView.kind === 'center' ? (
-          <CenterView />
+          <GalaxyView />
         ) : (
           <ConversationView id={state.activeView.id} />
         )}

@@ -44,14 +44,16 @@ export function layoutGalaxy(root: TaxonomyNode): GalaxyLayout {
   const edges: { from: string; to: string }[] = [];
   const cats = root.children;
   cats.forEach((cat, ci) => {
-    const catAngle = (ci / Math.max(cats.length, 1)) * Math.PI * 2 - Math.PI / 2;
-    const cx = Math.cos(catAngle) * 0.45, cy = Math.sin(catAngle) * 0.45;
+    // Elliptical ring (wide screens), rotated 30deg so no constellation sits at
+    // the exact bottom where the command card floats.
+    const catAngle = (ci / Math.max(cats.length, 1)) * Math.PI * 2 - Math.PI / 2 + Math.PI / 6;
+    const cx = Math.cos(catAngle) * 0.62, cy = Math.sin(catAngle) * 0.40;
     nodes.push({ id: cat.id, type: 'category', label: cat.label, x: cx, y: cy, r: 0.055, categoryIndex: ci });
     edges.push({ from: cat.id, to: 'root' });
     const docNodes = cat.children.flatMap((b) => b.children.flatMap((m) => m.children.filter((n) => n.type === 'document')));
     docNodes.forEach((doc, di) => {
       const a = (di / Math.max(docNodes.length, 1)) * Math.PI * 2 + ci; // ci offsets orbits per constellation
-      const dx = cx + Math.cos(a) * 0.16, dy = cy + Math.sin(a) * 0.16;
+      const dx = cx + Math.cos(a) * 0.15, dy = cy + Math.sin(a) * 0.15;
       nodes.push({ id: doc.id, type: 'document', label: doc.label, x: dx, y: dy, r: 0.03, parentId: cat.id, docId: doc.docId, categoryIndex: ci });
       edges.push({ from: doc.id, to: cat.id });
       doc.children.forEach((pg, pi) => {
