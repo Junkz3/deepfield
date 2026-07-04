@@ -69,6 +69,28 @@ export function candidatePages(docs: Document[], deviceQuery: string): Page[] {
   return docs.filter((d) => ids.has(d.id)).flatMap((d) => d.pages);
 }
 
+/** Cheap text-side prefilter before the visual rerank. The reranker reads
+ *  page IMAGES (~900 tokens each), so a 90-page pool costs 20-40s per round;
+ *  token overlap plus kind boosts keep the pool tight with zero extra calls.
+ *  Pages without a usable text layer (scans, photos) always pass: they are
+ *  exactly what the VISUAL rerank exists for. */
+export function trimPool(query: string, pages: Page[], cap = 40): Page[] {
+  if (pages.length <= cap) return pages;
+  const tokens = [...new Set(query.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 2))];
+  const KIND_BOOST: Partial<Record<PageKind, number>> = {
+    'error-table': 2, troubleshooting: 2, 'coverage-table': 2, procedure: 1, schematic: 1, 'video-segment': 1,
+  };
+  const untexted = pages.filter((p) => (p.text ?? '').trim().length < 40);
+  const texted = pages.filter((p) => (p.text ?? '').trim().length >= 40);
+  if (texted.length <= cap) return pages;
+  const scored = texted.map((p, i) => {
+    const hay = `${p.title ?? ''} ${p.text}`.toLowerCase();
+    return { p, i, s: tokens.filter((t) => hay.includes(t)).length * 2 + (KIND_BOOST[p.kind] ?? 0) };
+  });
+  scored.sort((a, b) => b.s - a.s || a.i - b.i);
+  return [...untexted, ...scored.slice(0, cap).map((x) => x.p)];
+}
+
 export function layoutGalaxy(root: TaxonomyNode): GalaxyLayout {
   const nodes: GalaxyNode[] = [];
   const edges: { from: string; to: string }[] = [];

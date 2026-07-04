@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildTaxonomy, candidatePages, layoutGalaxy, mergeDocs } from './taxonomy';
-import type { Document } from './types';
+import { buildTaxonomy, candidatePages, layoutGalaxy, mergeDocs, trimPool } from './taxonomy';
+import type { Document, Page } from './types';
 
 const doc = (id: string, category: string, brand: string, model: string, pages = 2): Document => ({
   id, filename: `${id}.pdf`, format: 'pdf', category, brand, model, docType: 'service',
@@ -67,6 +67,46 @@ describe('layoutGalaxy', () => {
     }
     expect(a.nodes.some((n) => n.type === 'page')).toBe(true);
     expect(a.edges.some((e) => e.from.startsWith('cat:'))).toBe(true);
+  });
+});
+
+describe('trimPool', () => {
+  const page = (n: number, text: string | undefined, kind: Page['kind'] = 'other'): Page =>
+    ({ docId: 'd', page: n, imageUrl: '', kind, text });
+  const FILLER = 'general information about the appliance and its everyday use, nothing specific here at all';
+
+  it('returns the pool untouched when it fits the cap', () => {
+    const pool = [page(1, FILLER), page(2, 'heating element resistance 22 ohms')];
+    expect(trimPool('heating element', pool, 40)).toBe(pool);
+  });
+
+  it('keeps the token-matching pages and drops filler when over the cap', () => {
+    const pool = [
+      ...Array.from({ length: 50 }, (_, i) => page(i + 1, FILLER)),
+      page(60, 'error code E3: heating element or thermistor fault, resistance table'),
+    ];
+    const out = trimPool('E3 heating element', pool, 8);
+    expect(out.length).toBe(8);
+    expect(out.some((p) => p.page === 60)).toBe(true);
+  });
+
+  it('always lets pages without a text layer through (scans are the visual rerank job)', () => {
+    const pool = [
+      ...Array.from({ length: 50 }, (_, i) => page(i + 1, FILLER)),
+      page(90, undefined),
+      page(91, undefined),
+    ];
+    const out = trimPool('anything specific', pool, 8);
+    expect(out.filter((p) => p.text === undefined).map((p) => p.page)).toEqual([90, 91]);
+  });
+
+  it('boosts high-value kinds so an error table survives even without a token hit', () => {
+    const pool = [
+      ...Array.from({ length: 50 }, (_, i) => page(i + 1, FILLER)),
+      page(70, `${FILLER} fault listing`, 'error-table'),
+    ];
+    const out = trimPool('symptom words absent from every page', pool, 8);
+    expect(out.some((p) => p.page === 70)).toBe(true);
   });
 });
 
