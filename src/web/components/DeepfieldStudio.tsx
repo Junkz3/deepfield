@@ -18,8 +18,8 @@ import './studio.css';
  *  the agent's own configuration from the dropped corpus. */
 
 const PRESETS = [
-  { id: 'repair', label: 'Repair & field service', hasSeed: true },
-  { id: 'insurance', label: 'Insurance & warranty', hasSeed: false },
+  { id: 'repair', label: 'Repair & field service', hasSeed: true, seedName: 'RepairCenter seed corpus' },
+  { id: 'insurance', label: 'Insurance & warranty', hasSeed: true, seedName: 'Insurance seed corpus (6 public policy wordings)' },
   { id: 'legal', label: 'Legal discovery', hasSeed: false },
   { id: 'custom', label: 'Custom: auto-calibrate', hasSeed: false },
 ];
@@ -36,10 +36,12 @@ async function calibrateTeam(input: TeamCalibrationInput): Promise<TeamCalibrati
 }
 
 interface Props {
-  onCreate: (name: string, corpus: Document[], liveFiles: File[]) => void;
+  onCreate: (name: string, corpus: Document[], liveFiles: File[], team: AgentSpec[], ops: WorkspaceTool[]) => void;
+  /** In-app panel mode (sidebar stays visible): shows a close button. */
+  onClose?: () => void;
 }
 
-export function DeepfieldStudio({ onCreate }: Props) {
+export function DeepfieldStudio({ onCreate, onClose }: Props) {
   const { state, dispatch } = useApp();
   const [name, setName] = useState('');
   const [preset, setPreset] = useState('repair');
@@ -60,18 +62,44 @@ export function DeepfieldStudio({ onCreate }: Props) {
   const [closing, setClosing] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
   const [calibrated, setCalibrated] = useState(false);
+  /** The insurance seed corpus, fetched lazily on first preset selection
+   *  (real pre-indexed public policy wordings, same rank as the repair seed). */
+  const [insuranceDocs, setInsuranceDocs] = useState<Document[] | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const seedAvailable = PRESETS.find((p) => p.id === preset)?.hasSeed ?? false;
+  useEffect(() => {
+    if (preset !== 'insurance' || insuranceDocs !== null) return;
+    fetch('/corpus-insurance/docs.json')
+      .then((r) => (r.ok ? (r.json() as Promise<Document[]>) : Promise.resolve<Document[]>([])))
+      .catch(() => [] as Document[])
+      .then(setInsuranceDocs);
+  }, [preset, insuranceDocs]);
+
+  /** In-app panel: pendingDocs only exists during boot studio mode, so the
+   *  repair seed is fetched the same lazy way the insurance one is. */
+  const [repairDocs, setRepairDocs] = useState<Document[] | null>(null);
+  useEffect(() => {
+    if (preset !== 'repair' || state.pendingDocs.length > 0 || repairDocs !== null) return;
+    fetch('/corpus/docs.json')
+      .then((r) => (r.ok ? (r.json() as Promise<Document[]>) : Promise.resolve<Document[]>([])))
+      .catch(() => [] as Document[])
+      .then(setRepairDocs);
+  }, [preset, state.pendingDocs.length, repairDocs]);
+
+  const activePreset = PRESETS.find((p) => p.id === preset);
+  const seedAvailable = activePreset?.hasSeed ?? false;
   const seedOn = seedAvailable && seed;
+  const seedDocs = preset === 'insurance'
+    ? insuranceDocs ?? []
+    : state.pendingDocs.length > 0 ? state.pendingDocs : repairDocs ?? [];
 
   const { matched, unmatched } = useMemo(
-    () => splitSeedFiles(files, state.pendingDocs),
-    [files, state.pendingDocs],
+    () => splitSeedFiles(files, seedDocs),
+    [files, seedDocs],
   );
   const corpus = useMemo(
-    () => (seedOn ? state.pendingDocs : matched),
-    [seedOn, state.pendingDocs, matched],
+    () => (seedOn ? seedDocs : matched),
+    [seedOn, seedDocs, matched],
   );
 
   // The universe behind the card previews the corpus selection live.
@@ -108,10 +136,10 @@ export function DeepfieldStudio({ onCreate }: Props) {
     if (next.some((a) => a.active)) setTeam(next);
   };
 
-  const dissolve = () => {
+  const dissolve = (chosenTeam: AgentSpec[], chosenOps: WorkspaceTool[]) => {
     setClosing(true);
     // Let the veil dissolve so the universe is already in view when it fills up.
-    setTimeout(() => onCreate(name, corpus, unmatched), 360);
+    setTimeout(() => onCreate(name, corpus, unmatched, chosenTeam, chosenOps), 360);
   };
 
   const create = async () => {
@@ -138,14 +166,12 @@ export function DeepfieldStudio({ onCreate }: Props) {
     else setWorkflowProfile(preset);
     // The workspace installs only the ops left enabled - and none at all
     // when no agent diagnoses (the diagnose path is the ops' only consumer).
-    dispatch({
-      type: 'set-ops',
-      ops: chosen.some((a) => a.profile.decisionMode === 'diagnosis')
-        ? ops.filter((t) => toolIds[t.id])
-        : [],
-    });
-    dispatch({ type: 'set-team', team: chosen });
-    dissolve();
+    // Team and ops travel WITH the create call: the store decides whether
+    // this replaces the boot workspace or parks the current one.
+    const chosenOps = chosen.some((a) => a.profile.decisionMode === 'diagnosis')
+      ? ops.filter((t) => toolIds[t.id])
+      : [];
+    dissolve(chosen, chosenOps);
   };
 
   return (
@@ -160,13 +186,19 @@ export function DeepfieldStudio({ onCreate }: Props) {
         </header>
 
         <section className="studio-card panel fade-up">
+          {onClose && (
+            <button className="studio-close mono" onClick={onClose} title="Back to the active workspace">
+              CLOSE
+            </button>
+          )}
           <label className="studio-label mono" htmlFor="ws-name">Workspace</label>
           <input
             id="ws-name"
             className="studio-name"
             placeholder="RepairCenter"
             value={name}
-            autoFocus
+            // touch: autofocus would shove the virtual keyboard over the form
+            autoFocus={!window.matchMedia('(pointer: coarse)').matches}
             onChange={(e) => setName(e.target.value)}
           />
 
@@ -224,9 +256,9 @@ export function DeepfieldStudio({ onCreate }: Props) {
           {seedAvailable && (
             <button className={`studio-seed ${seedOn ? 'on' : ''}`} onClick={() => setSeed(!seed)}>
               <span className="studio-seed-check" aria-hidden>{seedOn ? '✓' : ''}</span>
-              <span className="studio-seed-name">RepairCenter seed corpus</span>
+              <span className="studio-seed-name">{activePreset?.seedName}</span>
               <span className="studio-seed-count mono">
-                {state.pendingDocs.length > 0 ? `${state.pendingDocs.length} documents, pre-indexed` : 'loading…'}
+                {seedDocs.length > 0 ? `${seedDocs.length} documents, pre-indexed` : 'loading…'}
               </span>
             </button>
           )}

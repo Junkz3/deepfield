@@ -10,6 +10,10 @@
   color: var(--text-dim);
   border: 1px solid transparent;
   transition: color var(--t-fast), border-color var(--t-fast);
+  /* long press = walkie-talkie: never the iOS callout menu */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .voice-btn:hover { color: var(--accent); border-color: var(--line-strong); }
 

@@ -30,14 +30,39 @@ export function Sidebar() {
         </span>
       </div>
 
-      <button
-        className={`sidebar-center ${isCenter ? 'active' : ''}`}
-        onClick={() => dispatch({ type: 'open-center' })}
-      >
-        <GalaxyGlyph />
-        <span>Repair Center</span>
-        <span className="sidebar-count mono">{state.corpusDocs.length + state.sessionDocs.length}</span>
-      </button>
+      <div className="sidebar-section sidebar-workspaces">
+        <div className="sidebar-section-head">
+          <span>Workspaces</span>
+          <button
+            className="sidebar-new"
+            disabled={1 + state.workspaces.length >= 4}
+            title={1 + state.workspaces.length >= 4 ? 'Up to 4 workspaces per session' : 'New workspace'}
+            onClick={() => dispatch({ type: 'open-studio' })}
+          >
+            +
+          </button>
+        </div>
+        <button
+          className={`sidebar-center ${isCenter && !state.studioOpen ? 'active' : ''}`}
+          onClick={() => { dispatch({ type: 'close-studio' }); dispatch({ type: 'open-center' }); }}
+        >
+          <GalaxyGlyph />
+          <span>{state.workspaceName}</span>
+          <span className="sidebar-count mono">{state.corpusDocs.length + state.sessionDocs.length}</span>
+        </button>
+        {state.workspaces.map((w) => (
+          <button
+            key={w.id}
+            className="sidebar-center dormant"
+            title={`Switch to ${w.name}`}
+            onClick={() => dispatch({ type: 'switch-workspace', id: w.id })}
+          >
+            <GalaxyGlyph />
+            <span>{w.name}</span>
+            <span className="sidebar-count mono">{w.corpusDocs.length + w.sessionDocs.length}</span>
+          </button>
+        ))}
+      </div>
 
       <div className="sidebar-section">
         <div className="sidebar-section-head">
@@ -52,7 +77,7 @@ export function Sidebar() {
           </button>
         </div>
         <div className="sidebar-list">
-          {state.conversations.length === 0 && (
+          {state.conversations.length === 0 && state.workspaces.every((w) => w.conversations.length === 0) && (
             <div className="sidebar-empty">No conversations yet. Describe a fault to start.</div>
           )}
           {state.conversations.map((c) => {
@@ -65,9 +90,31 @@ export function Sidebar() {
               >
                 <span className="sidebar-item-device">{c.device}</span>
                 <span className="sidebar-item-symptom">{c.symptom}</span>
+                {state.workspaces.length > 0 && (
+                  <span className="sidebar-item-ws mono">{state.workspaceName}</span>
+                )}
               </button>
             );
           })}
+          {/* Parked workspaces keep their history in sight: opening one of
+              their conversations switches the whole workspace over. */}
+          {state.workspaces.flatMap((w) =>
+            w.conversations.map((c) => (
+              <button
+                key={c.id}
+                className="sidebar-item dormant"
+                title={`In ${w.name} - opens after switching`}
+                onClick={() => {
+                  dispatch({ type: 'switch-workspace', id: w.id });
+                  dispatch({ type: 'open-conversation', id: c.id });
+                }}
+              >
+                <span className="sidebar-item-device">{c.device}</span>
+                <span className="sidebar-item-symptom">{c.symptom}</span>
+                <span className="sidebar-item-ws mono">{w.name}</span>
+              </button>
+            )),
+          )}
         </div>
       </div>
 
@@ -97,13 +144,17 @@ export function Sidebar() {
       </div>
       <VoiceToggle />
       <div className="sidebar-foot">
-        <span className="chip" title="Ctrl+Shift+D toggles the driver">
+        <button
+          className="chip sidebar-driver"
+          title="Toggle the inference driver (Ctrl+Shift+D)"
+          onClick={() => dispatch({ type: 'set-driver', kind: state.driverKind === 'fake' ? 'vultr' : 'fake' })}
+        >
           <span
             className="dot"
             style={{ background: state.driverKind === 'vultr' ? 'var(--ok)' : 'var(--warn)' }}
           />
           {state.driverKind === 'vultr' ? 'VULTR LIVE' : 'OFFLINE SCRIPT'}
-        </span>
+        </button>
         <button
           className="sidebar-reset mono"
           title="Clear conversations and session files, back to the seeded corpus"

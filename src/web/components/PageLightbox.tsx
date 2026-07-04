@@ -57,7 +57,39 @@ export function PageLightbox() {
   const [patchStyles, setPatchStyles] = useState<PatchStyle[]>([]);
   const wrapRef = useRef<HTMLSpanElement>(null);
   const [zoom, setZoom] = useState({ scale: 1, tx: 0, ty: 0 });
-  const drag = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  // Unified mouse + touch gestures: one pointer pans, two pinch-zoom.
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const gesture = useRef<
+    | { mode: 'pan'; x: number; y: number; tx: number; ty: number }
+    | { mode: 'pinch'; dist: number; mx: number; my: number }
+    | null
+  >(null);
+  const tapRef = useRef<{ t: number; x: number; y: number } | null>(null);
+  const lastTapRef = useRef<{ t: number; x: number; y: number } | null>(null);
+
+  // Re-anchor the gesture whenever the finger count changes: two = pinch,
+  // one on a zoomed page = pan (also the hand-off when a pinch finger lifts).
+  const syncGesture = () => {
+    const pts = [...pointers.current.values()];
+    if (pts.length >= 2) {
+      const [a, b] = pts;
+      gesture.current = { mode: 'pinch', dist: Math.hypot(b.x - a.x, b.y - a.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+    } else if (pts.length === 1 && zoomRef.current.scale > 1) {
+      gesture.current = { mode: 'pan', x: pts[0].x, y: pts[0].y, tx: zoomRef.current.tx, ty: zoomRef.current.ty };
+    } else {
+      gesture.current = null;
+    }
+  };
+
+  const zoomToggleAt = (clientX: number, clientY: number, el: HTMLElement) => {
+    if (zoomRef.current.scale > 1) { setZoom({ scale: 1, tx: 0, ty: 0 }); return; }
+    const r = el.getBoundingClientRect();
+    const cx = clientX - (r.left + r.width / 2);
+    const cy = clientY - (r.top + r.height / 2);
+    setZoom({ scale: 2.2, tx: cx - 2.2 * cx, ty: cy - 2.2 * cy });
+  };
 
   const doc = lb ? docs.find((d) => d.id === lb.docId) : undefined;
   const idx = doc ? Math.max(0, doc.pages.findIndex((p) => p.page === lb!.page)) : 0;
@@ -191,32 +223,80 @@ export function PageLightbox() {
             ref={wrapRef}
             style={zoom.scale > 1 ? { transform: `translate(${zoom.tx}px, ${zoom.ty}px) scale(${zoom.scale})` } : undefined}
             onAnimationEnd={(e) => e.currentTarget.classList.remove('page-rise')}
-            onDoubleClick={(e) => {
-              if (zoom.scale > 1) { setZoom({ scale: 1, tx: 0, ty: 0 }); return; }
-              const r = e.currentTarget.getBoundingClientRect();
-              const cx = e.clientX - (r.left + r.width / 2);
-              const cy = e.clientY - (r.top + r.height / 2);
-              setZoom({ scale: 2.2, tx: cx - 2.2 * cx, ty: cy - 2.2 * cy });
+            onDoubleClick={(e) => zoomToggleAt(e.clientX, e.clientY, e.currentTarget)}
+            onPointerDown={(e) => {
+              if (e.pointerType === 'mouse') {
+                if (zoom.scale === 1) return; // keep native dblclick behavior when not zoomed
+                e.preventDefault();
+              } else {
+                // candidate tap: invalidated by a second finger or by moving
+                tapRef.current = pointers.current.size === 0 ? { t: performance.now(), x: e.clientX, y: e.clientY } : null;
+              }
+              try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
+              pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+              syncGesture();
             }}
-            onMouseDown={(e) => {
-              if (zoom.scale === 1) return;
-              e.preventDefault();
-              drag.current = { x: e.clientX, y: e.clientY, tx: zoom.tx, ty: zoom.ty };
+            onPointerMove={(e) => {
+              if (!pointers.current.has(e.pointerId)) return;
+              pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+              const g = gesture.current;
+              if (!g) return;
+              if (g.mode === 'pan') {
+                const tx = g.tx + e.clientX - g.x;
+                const ty = g.ty + e.clientY - g.y;
+                setZoom((z) => ({ ...z, tx, ty }));
+              } else {
+                const pts = [...pointers.current.values()];
+                if (pts.length < 2) return;
+                const [a, b] = pts;
+                const dist = Math.hypot(b.x - a.x, b.y - a.y);
+                const mx = (a.x + b.x) / 2;
+                const my = (a.y + b.y) / 2;
+                const r = e.currentTarget.getBoundingClientRect();
+                const dmx = mx - g.mx;
+                const dmy = my - g.my;
+                const ratio = g.dist > 0 ? dist / g.dist : 1;
+                setZoom((z) => {
+                  const scale = Math.min(4.5, Math.max(1, z.scale * ratio));
+                  if (scale === 1) return { scale: 1, tx: 0, ty: 0 };
+                  const k = scale / z.scale;
+                  const cx = mx - (r.left + r.width / 2);
+                  const cy = my - (r.top + r.height / 2);
+                  // same keep-the-point-fixed rule as the wheel; midpoint drift pans
+                  return { scale, tx: cx - k * (cx - z.tx) + dmx, ty: cy - k * (cy - z.ty) + dmy };
+                });
+                gesture.current = { mode: 'pinch', dist, mx, my };
+              }
             }}
-            onMouseMove={(e) => {
-              const d = drag.current;
-              if (!d) return;
-              const tx = d.tx + e.clientX - d.x;
-              const ty = d.ty + e.clientY - d.y;
-              setZoom((z) => ({ ...z, tx, ty }));
+            onPointerUp={(e) => {
+              pointers.current.delete(e.pointerId);
+              // Manual double-tap: Safari does not deliver dblclick reliably on touch
+              if (e.pointerType !== 'mouse' && tapRef.current) {
+                const tap = tapRef.current;
+                tapRef.current = null;
+                const now = performance.now();
+                if (now - tap.t < 300 && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 12) {
+                  const prev = lastTapRef.current;
+                  lastTapRef.current = { t: now, x: e.clientX, y: e.clientY };
+                  if (prev && now - prev.t < 350 && Math.hypot(e.clientX - prev.x, e.clientY - prev.y) < 40) {
+                    lastTapRef.current = null;
+                    zoomToggleAt(e.clientX, e.clientY, e.currentTarget);
+                  }
+                }
+              }
+              syncGesture();
             }}
-            onMouseUp={() => { drag.current = null; }}
-            onMouseLeave={() => { drag.current = null; }}
+            onPointerCancel={(e) => {
+              pointers.current.delete(e.pointerId);
+              tapRef.current = null;
+              syncGesture();
+            }}
           >
             <img
               ref={imgRef}
               src={page.imageUrl}
               alt={`${doc.model} page ${page.page}`}
+              draggable={false}
               onLoad={() => imgRef.current && setImgH(imgRef.current.clientHeight)}
             />
             {blocks && showTranslated && (() => {

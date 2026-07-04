@@ -4,6 +4,7 @@
   bottom: calc(var(--sp-4) + 76px);
   width: 340px;
   max-height: 46vh;
+  max-height: 46dvh;
   overflow-y: auto;
   padding: var(--sp-3);
   z-index: 30;

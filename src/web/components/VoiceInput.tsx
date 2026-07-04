@@ -13,6 +13,8 @@ import './voice.css';
 
 type Phase = 'hidden' | 'idle' | 'rec' | 'busy';
 const MAX_SECONDS = 30;
+const HOLD_MS = 300; // touch press longer than this = walkie-talkie
+const COARSE_POINTER = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
 const isEditable = (t: EventTarget | null): boolean =>
   t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
@@ -97,6 +99,21 @@ export function VoiceInput({ lang, onText, onSubmit }: {
   };
   startFnRef.current = start;
 
+  // Touch walkie-talkie: hold the mic = record while held, release = the
+  // request goes STRAIGHT to the agent (the V-key flow, one finger). A short
+  // tap keeps the classic toggle-and-fill behavior.
+  const holdTimerRef = useRef(0);
+  const holdRef = useRef(false);
+
+  const stopRec = () => {
+    if (recRef.current?.state === 'recording') recRef.current.stop();
+    else pendingStopRef.current = true; // released before the mic opened
+  };
+  const tapToggle = () => {
+    if (phaseRef.current === 'rec') recRef.current?.stop();
+    else if (phaseRef.current === 'idle') { viaKeyRef.current = false; void start(); }
+  };
+
   // Global walkie-talkie key. Ignored while typing in any field.
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -127,7 +144,11 @@ export function VoiceInput({ lang, onText, onSubmit }: {
   if (phase === 'hidden') return null;
   return (
     <>
-      {phase === 'idle' && <kbd className="voice-key mono" title="Hold V, speak, release: the request goes straight to the agent">V</kbd>}
+      {phase === 'idle' && (
+        COARSE_POINTER
+          ? <kbd className="voice-key mono">HOLD</kbd>
+          : <kbd className="voice-key mono" title="Hold V, speak, release: the request goes straight to the agent">V</kbd>
+      )}
       {phase === 'rec' && (
         <span className="voice-timer mono">{`0:${String(secs).padStart(2, '0')}`}</span>
       )}
@@ -136,14 +157,39 @@ export function VoiceInput({ lang, onText, onSubmit }: {
         title={
           phase === 'rec' ? 'Stop and transcribe (Escape cancels)'
             : phase === 'busy' ? 'Transcribing (NVIDIA Parakeet)'
-              : 'Speak your request - click to fill the bar, or hold V to talk straight to the agent'
+              : 'Speak your request - tap to fill the bar, or hold to talk straight to the agent'
         }
         aria-label="Voice input"
         disabled={phase === 'busy'}
-        onClick={() => {
-          if (phase === 'rec') recRef.current?.stop();
-          else { viaKeyRef.current = false; void start(); }
+        onPointerDown={(e) => {
+          try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
+          if (phaseRef.current !== 'idle') return;
+          holdRef.current = false;
+          window.clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = window.setTimeout(() => {
+            // long press: still inside iOS transient user activation, so
+            // getUserMedia is allowed here
+            holdRef.current = true;
+            viaKeyRef.current = true;
+            pendingStopRef.current = false;
+            void startFnRef.current();
+          }, HOLD_MS);
         }}
+        onPointerUp={() => {
+          window.clearTimeout(holdTimerRef.current);
+          if (holdRef.current) { holdRef.current = false; stopRec(); return; }
+          tapToggle();
+        }}
+        onPointerCancel={() => {
+          window.clearTimeout(holdTimerRef.current);
+          if (holdRef.current) {
+            holdRef.current = false;
+            cancelRef.current = true;
+            recRef.current?.stop();
+          }
+        }}
+        onContextMenu={(e) => e.preventDefault()}
+        onClick={(e) => { if (e.detail === 0) tapToggle(); }} // keyboard activation only
       >
         {phase === 'busy' ? (
           <svg className="voice-spin" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

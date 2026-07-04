@@ -320,6 +320,7 @@
 .cite-img-wrap.zoomed img {
   display: block;
   height: min(84vh, 1200px);
+  height: min(84dvh, 1200px); /* iOS: track the dynamic Safari bar */
   width: auto;
   max-width: 88vw;
   object-fit: contain;
@@ -365,6 +366,7 @@
 .wo-sheet {
   width: min(880px, 96vw);
   max-height: 92vh;
+  max-height: 92dvh;
   overflow-y: auto;
   background: var(--bg2);
   border: 1px solid var(--line-strong);
@@ -476,7 +478,7 @@
 
 .cmdbar-zone {
   position: absolute;
-  bottom: var(--sp-6);
+  bottom: calc(var(--sp-6) + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 20;
@@ -587,7 +589,8 @@
 
 .lightbox-nav {
   position: fixed;
-  bottom: var(--sp-3);
+  bottom: calc(var(--sp-3) + env(safe-area-inset-bottom, 0px));
+  touch-action: pan-x; /* thumbnail strip scrolls sideways, never zooms the page */
   left: 50%;
   transform: translateX(-50%);
   z-index: 62;
@@ -669,6 +672,7 @@
 .translate-pane {
   width: min(430px, 36vw);
   max-height: 86vh;
+  max-height: 86dvh;
   display: flex;
   flex-direction: column;
   background: rgba(15, 21, 28, 0.88);
@@ -763,6 +767,7 @@
 }
 .cite-lightbox.docked .cite-img-wrap.zoomed img {
   height: min(72vh, 1000px);
+  height: min(72dvh, 1000px);
   max-width: calc(100vw - 264px - min(640px, 46%) - 120px);
 }
 /* The docked container is animated (transform), which turns it into the
@@ -790,10 +795,14 @@
 }
 .page-rise { animation: rc-page-rise 0.42s cubic-bezier(0.22, 0.9, 0.3, 1) both; }
 
-/* ---- Page zoom (wheel / double-click / drag to pan) ---- */
+/* ---- Page zoom (wheel or pinch / double-tap / drag to pan) ---- */
 
 .cite-lightbox { overflow: hidden; }
-.cite-img-wrap.zoomed { will-change: transform; }
+.cite-img-wrap.zoomed {
+  will-change: transform;
+  /* all gestures on the page image are ours: pinch zooms the PAGE, not iOS */
+  touch-action: none;
+}
 .cite-img-wrap.zoomed.panning { cursor: grab; }
 .cite-img-wrap.zoomed.panning:active { cursor: grabbing; }
 
@@ -823,3 +832,39 @@
   color: var(--accent-strong);
 }
 .step-answer ul { padding-left: 1.1em; display: flex; flex-direction: column; gap: 4px; }
+
+/* The structured verdict under the guidance line: fault, printed cause,
+   ordered checks - the substance of what the agent read. */
+.step-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--ok);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ok) 4%, transparent);
+}
+.step-verdict-row {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: var(--sp-2);
+  align-items: start;
+}
+.step-verdict-k {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--text-faint);
+  padding-top: 2px;
+}
+.step-verdict-v { font-size: var(--fs-sm); line-height: 1.5; }
+.step-verdict-checks {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.step-verdict-reads { display: flex; flex-wrap: wrap; gap: var(--sp-1); }

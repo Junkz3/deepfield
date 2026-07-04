@@ -1078,8 +1078,26 @@ function FileCard({ node, targetPos, ghost, bornAtCore, isHit, hitCount, onHover
             <meshBasicMaterial color={node.color} transparent opacity={ghost ? 0.05 : isHit ? 1 : 0.75} depthWrite={false} />
           </mesh>
         )}
+        <mesh key={cover ? 'cover' : 'holo'}>
+          <planeGeometry args={dims} />
+          {cover ? (
+            <meshBasicMaterial ref={mat} map={cover} transparent depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
+          ) : (
+            <meshBasicMaterial
+              ref={mat}
+              map={holo}
+              transparent
+              depthWrite={false}
+              side={THREE.DoubleSide}
+              color={isHit ? '#ffffff' : node.color}
+              blending={THREE.AdditiveBlending}
+            />
+          )}
+        </mesh>
+        {/* Enlarged invisible hit target: a finger-sized raycast zone (and a
+            more forgiving hover on desktop). ALL interaction lives here. */}
         <mesh
-          key={cover ? 'cover' : 'holo'}
+          position={[0, 0, 0.004]}
           onPointerOver={(e) => {
             if (disabled || (ghost && !vr)) return;
             e.stopPropagation();
@@ -1139,20 +1157,8 @@ function FileCard({ node, targetPos, ghost, bornAtCore, isHit, hitCount, onHover
             onSelect(node.doc.id);
           }}
         >
-          <planeGeometry args={dims} />
-          {cover ? (
-            <meshBasicMaterial ref={mat} map={cover} transparent depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
-          ) : (
-            <meshBasicMaterial
-              ref={mat}
-              map={holo}
-              transparent
-              depthWrite={false}
-              side={THREE.DoubleSide}
-              color={isHit ? '#ffffff' : node.color}
-              blending={THREE.AdditiveBlending}
-            />
-          )}
+          <planeGeometry args={[dims[0] * 1.5, dims[1] * 1.5]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} side={THREE.DoubleSide} />
         </mesh>
         {isVideo && !ghost && (
           <sprite position={[0, 0, 0.01]} scale={[0.11, 0.11, 1]}>
@@ -1582,6 +1588,8 @@ function CameraRig({ focus, panelOpen }: { focus: THREE.Vector3 | null; panelOpe
   // setViewOffset has no feedback loop, so the camera can truly come to rest
   // (the old camera-space shift orbited forever and made the cards drift).
   const viewX = useRef(0);
+  const settling = useRef(true);
+  const focusKey = useRef('__init__');
   useFrame((_, dt) => {
     const cam = camera as THREE.PerspectiveCamera;
     const wantX = panelOpen ? -Math.min(640, size.width * 0.46) / 2 : 0;
@@ -1596,15 +1604,23 @@ function CameraRig({ focus, panelOpen }: { focus: THREE.Vector3 | null; panelOpe
 
     if (!controls.current) return;
     const c = controls.current;
+
+    // The rig only OWNS the camera while flying to a new focus. Once settled
+    // it lets go for good, so a user's pinch-zoom or orbit is never fought
+    // frame by frame (the frozen-world rule, extended to the distance).
+    const key = focus ? `${focus.x.toFixed(2)},${focus.y.toFixed(2)},${focus.z.toFixed(2)}` : 'none';
+    if (key !== focusKey.current) { focusKey.current = key; settling.current = true; }
+    if (!settling.current) return;
+
     const lookTarget = focus ? focus.clone().multiplyScalar(0.82) : new THREE.Vector3(0, 0, 0);
     const wantDist = focus ? 6.2 : 10.2;
     const dir = new THREE.Vector3().subVectors(camera.position, c.target);
 
     // At rest, STOP: an asymptotic lerp never truly arrives, and billboarded
-    // cards re-face the drifting camera forever (the frozen-world rule).
+    // cards re-face the drifting camera forever.
     const targetErr = c.target.distanceTo(lookTarget);
     const distErr = Math.abs(dir.length() - wantDist);
-    if (targetErr < 0.005 && distErr < 0.01) return;
+    if (targetErr < 0.005 && distErr < 0.01) { settling.current = false; return; }
 
     c.target.lerp(lookTarget, Math.min(dt * 2.4, 1));
     const newDist = THREE.MathUtils.lerp(dir.length(), wantDist, Math.min(dt * 1.6, 1));

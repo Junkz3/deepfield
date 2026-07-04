@@ -1,0 +1,48 @@
+/* Finger-first overrides. Imported LAST (main.tsx) so it wins the cascade.
+   Active only on coarse pointers: desktop and the demo video stay pixel-identical. */
+
+@media (pointer: coarse) {
+  /* iOS auto-zooms the whole page when a focused field is under 16px */
+  input, textarea, select { font-size: 16px; }
+
+  /* ---- Primary controls grow to the 44px touch target ---- */
+  .btn { padding: 11px 18px; font-size: var(--fs-md); }
+  .cmdbar-clip { width: 44px; height: 44px; }
+  .cmdbar-go { width: 44px; height: 44px; }
+  .voice-btn { width: 44px; height: 44px; }
+  .cmdbar-preset { padding: 9px 16px; font-size: var(--fs-sm); }
+  .cite-chip { padding: 8px 14px; font-size: var(--fs-sm); }
+  .timeline-hit { padding: 8px 14px; font-size: var(--fs-sm); }
+  .lightbox-chapter { padding: 11px 16px; font-size: var(--fs-sm); }
+  .lightbox-thumb { width: 64px; }
+  .lightbox-thumb img { height: 84px; }
+  .galaxy-add { padding: var(--sp-3) var(--sp-5); font-size: var(--fs-md); }
+  .galaxy-filter-chip { padding: 9px 16px; font-size: var(--fs-sm); }
+  .newconv-preset { padding: 10px 12px; font-size: var(--fs-sm); }
+  .selfcheck-cite { padding: 7px 12px; font-size: var(--fs-xs); }
+  .agent-chip, .agent-dock.compact .agent-chip { padding: 9px 16px; font-size: var(--fs-sm); }
+  .sidebar-item { padding: var(--sp-3); }
+  .sidebar-lang-select { padding: 10px 8px; }
+  .studio-tool { padding: 12px 14px; }
+  .studio-preset, .studio-agent { padding: 12px 14px; }
+
+  /* The citation's useful text is no longer hover-gated */
+  .cite-chip-title { color: var(--text); }
+
+  /* ---- Secondary controls: same look, invisibly larger touch zone ---- */
+  .sidebar-new, .sidebar-reset, .sidebar-driver, .sidebar-lang,
+  .selfcheck-close, .translate-head button { position: relative; }
+  /* (.studio-close is already position:absolute; only the zone extends) */
+  .sidebar-new::after, .sidebar-reset::after, .sidebar-driver::after,
+  .selfcheck-close::after, .studio-close::after,
+  .translate-head button::after {
+    content: '';
+    position: absolute;
+    inset: -10px;
+  }
+  .sidebar-lang::after {
+    content: '';
+    position: absolute;
+    inset: -10px -2px; /* row neighbors: do not steal the next button's taps */
+  }
+}

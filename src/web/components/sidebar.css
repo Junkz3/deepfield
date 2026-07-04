@@ -154,6 +154,10 @@
 }
 
 .sidebar-foot { justify-content: space-between; align-items: center; }
+/* The driver badge is a real button (the touch twin of Ctrl+Shift+D) */
+.sidebar-driver { transition: border-color var(--t-fast), color var(--t-fast); }
+.sidebar-driver:hover { border-color: var(--accent); color: var(--text); }
+
 .sidebar-reset {
   font-size: var(--fs-xs);
   letter-spacing: 0.1em;
@@ -196,3 +200,22 @@
   padding: 4px 6px;
 }
 .sidebar-lang-select:focus { border-color: var(--accent); outline: none; }
+
+/* Workspace switcher: natural height (4 workspaces max), so the
+   conversations section below keeps every remaining pixel and scrolls. */
+.sidebar-section.sidebar-workspaces { flex: 0 0 auto; gap: 4px; }
+.sidebar-center.dormant { opacity: 0.55; }
+.sidebar-center.dormant:hover { opacity: 1; }
+.sidebar-new:disabled { opacity: 0.35; cursor: default; }
+.sidebar-new:disabled:hover { color: var(--text-dim); border-color: var(--line-strong); }
+
+/* Which workspace a conversation belongs to (shown once several exist). */
+.sidebar-item-ws {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+.sidebar-item.dormant { opacity: 0.6; }
+.sidebar-item.dormant:hover { opacity: 1; }

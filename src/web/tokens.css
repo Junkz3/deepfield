@@ -69,6 +69,8 @@
 html, body, #root {
   height: 100%;
   margin: 0;
+  /* iOS: no rubber-band or pull-to-refresh mid-gesture over the 3D scene */
+  overscroll-behavior: none;
 }
 
 body {
@@ -95,7 +97,11 @@ button {
   border: none;
   padding: 0;
   cursor: pointer;
+  /* kills the 300ms tap delay and native double-tap zoom on controls */
+  touch-action: manipulation;
 }
+
+a, label, select { touch-action: manipulation; }
 
 input, textarea {
   font: inherit;
