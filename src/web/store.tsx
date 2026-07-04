@@ -3,7 +3,7 @@
 // live here, conversations persisted to localStorage.
 import { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
 import type { ReactNode } from 'react';
-import type { Attachment, Conversation, Document, GuidedStep, Page } from '../agent/types';
+import type { Attachment, Conversation, Document, GuidedStep, Page, Phase } from '../agent/types';
 import { mergeDocs } from '../agent/taxonomy';
 import { presetTeam } from '../agent/team';
 import type { WorkspaceTool } from '../agent/tools';
@@ -58,6 +58,10 @@ export interface AppState {
   /** docs fetched during studio mode, held until create-workspace */
   pendingDocs: Document[];
   workspaceName: string;
+  /** message typed from the VR bar, consumed by the active ConversationView */
+  vrOutbox: string | null;
+  /** live agent feed mirrored for the VR side panel (capped, latest last) */
+  vrLog: { phase: Phase; summary: string }[];
   /** the workspace agent team; the user toggles who is active per request */
   team: AgentSpec[];
   /** the workspace op registry: shipped repair ops or calibration-written */
@@ -86,6 +90,9 @@ export type Action =
   | { type: 'set-ops'; ops: WorkspaceTool[] }
   | { type: 'toggle-agent'; id: string }
   | { type: 'studio-preview'; corpus: Document[] }
+  | { type: 'vr-outbox'; text: string | null }
+  | { type: 'vr-log-push'; entry: { phase: Phase; summary: string } }
+  | { type: 'vr-log-clear' }
   | { type: 'demo-reset' };
 
 const LS_KEY = 'rc.conversations';
@@ -140,6 +147,8 @@ export const initialState: AppState = {
   studioMode: isStudioMode(),
   pendingDocs: [],
   workspaceName: 'RepairCenter',
+  vrOutbox: null,
+  vrLog: [],
   team: presetTeam('repair'),
   ops: TOOL_REGISTRY,
 };
@@ -188,6 +197,12 @@ export function reducer(state: AppState, a: Action): AppState {
         sessionDocs: state.sessionDocs.map((d) =>
           d.id === a.docId ? { ...d, pages: [...d.pages, ...a.pages.filter((p) => !d.pages.some((x) => x.page === p.page))] } : d),
       };
+    case 'vr-outbox':
+      return { ...state, vrOutbox: a.text };
+    case 'vr-log-push':
+      return { ...state, vrLog: [...state.vrLog, a.entry].slice(-10) };
+    case 'vr-log-clear':
+      return { ...state, vrLog: [] };
     case 'open-center':
       return { ...state, activeView: { kind: 'center' } };
     case 'open-conversation': {

@@ -121,6 +121,16 @@ export function ConversationView({ id }: { id: string }) {
     }
   }, [conv, live.running, run]);
 
+  // Messages typed from the VR bar land here: the active conversation
+  // consumes the outbox and feeds the runner, same path as the DOM input.
+  useEffect(() => {
+    if (state.vrOutbox && !live.running) {
+      const text = state.vrOutbox;
+      dispatch({ type: 'vr-outbox', text: null });
+      void run(text);
+    }
+  }, [state.vrOutbox, live.running, dispatch, run]);
+
   useEffect(() => {
     streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: 'smooth' });
   }, [live.events.length, conv?.steps.length]);

@@ -26,6 +26,7 @@ export function useStepRunner(conversationId: string) {
       if (!conv) return;
       runningRef.current = true;
       setLive({ events: [], running: true, userInput });
+      dispatch({ type: 'vr-log-clear' });
       try {
         const driver = await getDriver(state.driverKind);
         const gen = runStep({ conversation: conv, docs, userInput }, driver);
@@ -42,6 +43,7 @@ export function useStepRunner(conversationId: string) {
           }
           const e = n.value;
           setLive((prev) => ({ ...prev, events: [...prev.events, e], running: true, currentPhase: e.phase }));
+          dispatch({ type: 'vr-log-push', entry: { phase: e.phase, summary: e.summary } });
           if (e.phase === 'retrieve') {
             if (e.hitPages) {
               dispatch({ type: 'set-scanning', scanning: false });

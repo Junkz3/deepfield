@@ -141,6 +141,26 @@
 }
 .galaxy-tree-toggle.active { border-color: var(--accent); color: var(--accent-strong); }
 
+.galaxy-vr-btn {
+  position: absolute;
+  top: var(--sp-4);
+  right: var(--sp-4);
+  z-index: 20;
+}
+
+/* Focusable but invisible: receives keystrokes for the VR message bar. */
+.galaxy-vr-hidden-input {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  width: 2px;
+  height: 2px;
+  opacity: 0.01;
+  border: none;
+  background: transparent;
+  pointer-events: none;
+}
+
 .galaxy-tree-drawer {
   position: absolute;
   top: 64px;

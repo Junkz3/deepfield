@@ -16,11 +16,20 @@
   "author": "",
   "license": "ISC",
   "type": "module",
+  "overrides": {
+    "@iwer/devui": {
+      "three": "$three"
+    },
+    "@iwer/sem": {
+      "three": "$three"
+    }
+  },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource/space-grotesk": "^5.2.10",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
+    "@react-three/xr": "^6.6.30",
     "pdfjs-dist": "^6.1.200",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
