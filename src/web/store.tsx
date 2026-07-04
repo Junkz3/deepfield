@@ -58,6 +58,7 @@ export type Action =
   | { type: 'new-conversation'; id: string; device: string; symptom: string; attachments: Attachment[] }
   | { type: 'append-step'; conversationId: string; step: GuidedStep }
   | { type: 'set-highlight'; pages: { docId: string; page: number }[] }
+  | { type: 'add-highlight'; pages: { docId: string; page: number }[] }
   | { type: 'set-scanning'; scanning: boolean }
   | { type: 'set-driver'; kind: DriverKind }
   | { type: 'open-lightbox'; docId: string; page: number }
@@ -124,6 +125,11 @@ export function reducer(state: AppState, a: Action): AppState {
       };
     case 'set-highlight':
       return { ...state, highlight: a.pages };
+    case 'add-highlight': {
+      // Accumulate within a step so the universe expands as the agent digs.
+      const fresh = a.pages.filter((p) => !state.highlight.some((h) => h.docId === p.docId && h.page === p.page));
+      return fresh.length > 0 ? { ...state, highlight: [...state.highlight, ...fresh] } : state;
+    }
     case 'set-scanning':
       return { ...state, scanning: a.scanning };
     case 'set-driver':

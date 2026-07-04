@@ -507,12 +507,25 @@ function FileCard({ node, targetPos, ghost, bornAtCore, isHit, hitCount, onHover
 
 /* ---------- the agent reads: real manual pages fan out in space ---------- */
 
+const PLAY_SHAPE = (() => {
+  const sh = new THREE.Shape();
+  sh.moveTo(-0.022, 0.036);
+  sh.lineTo(-0.022, -0.036);
+  sh.lineTo(0.042, 0);
+  sh.closePath();
+  return sh;
+})();
+
 function FloatingPage({ url, label, title, index, total, anchor, color, onClick }: {
   url: string; label?: string; title?: string; index: number; total: number; anchor: THREE.Vector3; color: string; onClick: () => void;
 }) {
   const [tex, setTex] = useState<THREE.Texture | null>(null);
   const group = useRef<THREE.Group>(null);
   const born = useRef(0);
+  // mm:ss label only exists on video segments: frames are 16:9, pages portrait
+  const video = !!label;
+  const W = video ? 0.82 : 0.54;
+  const H = video ? 0.46 : 0.72;
 
   useEffect(() => {
     let alive = true;
@@ -525,19 +538,25 @@ function FloatingPage({ url, label, title, index, total, anchor, color, onClick 
   const target = useMemo(() => {
     const up = anchor.clone().normalize();
     const side = new THREE.Vector3().crossVectors(up, new THREE.Vector3(0, 1, 0)).normalize();
-    const spread = (index - (total - 1) / 2) * 0.56;
+    const gap = total > 4 ? 0.46 : 0.56; // tighten the fan when the agent pulled many pages
+    const spread = (index - (total - 1) / 2) * gap;
     return anchor.clone()
       .addScaledVector(up, 0.75 + Math.abs(spread) * 0.08)
       .addScaledVector(side, spread);
   }, [anchor, index, total]);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, dt) => {
     if (!group.current) return;
     if (born.current === 0) born.current = clock.elapsedTime;
     const age = clock.elapsedTime - born.current;
     const k = Math.min(age / 0.55, 1);
     const ease = 1 - Math.pow(1 - k, 3);
-    group.current.position.lerpVectors(anchor, target, ease);
+    if (k < 1) {
+      group.current.position.lerpVectors(anchor, target, ease);
+    } else {
+      // target moves when later retrieves widen the fan: glide, don't snap
+      group.current.position.lerp(target, Math.min(dt * 4, 1));
+    }
     group.current.position.y += Math.sin(clock.elapsedTime * 1.4 + index * 2) * 0.02;
     group.current.scale.setScalar(0.25 + ease * 0.75);
   });
@@ -547,20 +566,40 @@ function FloatingPage({ url, label, title, index, total, anchor, color, onClick 
     <group ref={group} position={anchor}>
       <Billboard>
         <mesh position={[0, 0, -0.004]}>
-          <planeGeometry args={[0.56, 0.74]} />
-          <meshBasicMaterial color={color} transparent opacity={0.55} depthWrite={false} blending={THREE.AdditiveBlending} />
+          <planeGeometry args={[W + 0.02, H + 0.02]} />
+          <meshBasicMaterial color={video ? '#ffb454' : color} transparent opacity={video ? 0.7 : 0.55} depthWrite={false} blending={THREE.AdditiveBlending} />
         </mesh>
         <mesh onClick={(e) => { e.stopPropagation(); onClick(); }}>
-          <planeGeometry args={[0.54, 0.72]} />
+          <planeGeometry args={[W, H]} />
           <meshBasicMaterial map={tex} toneMapped={false} />
         </mesh>
-        {label && (
-          <Text font={displayFont} position={[0, -0.44, 0]} fontSize={0.1} color="#ffc678" anchorX="center" outlineWidth={0.006} outlineColor="#080b10">
-            {label}
-          </Text>
+        {video && (
+          <group position={[0, 0, 0.004]}>
+            {/* play badge, cinema-style */}
+            <mesh>
+              <circleGeometry args={[0.088, 40]} />
+              <meshBasicMaterial color="#05070a" transparent opacity={0.55} depthWrite={false} />
+            </mesh>
+            <mesh>
+              <ringGeometry args={[0.082, 0.09, 48]} />
+              <meshBasicMaterial color="#ffffff" transparent opacity={0.9} depthWrite={false} />
+            </mesh>
+            <mesh position={[0.004, 0, 0.001]}>
+              <shapeGeometry args={[PLAY_SHAPE]} />
+              <meshBasicMaterial color="#ffffff" transparent opacity={0.95} depthWrite={false} />
+            </mesh>
+            {/* timestamp chip inside the frame */}
+            <mesh position={[-W / 2 + 0.1, -H / 2 + 0.062, 0]}>
+              <planeGeometry args={[0.16, 0.076]} />
+              <meshBasicMaterial color="#05070a" transparent opacity={0.72} depthWrite={false} />
+            </mesh>
+            <Text font={displayFont} position={[-W / 2 + 0.1, -H / 2 + 0.062, 0.001]} fontSize={0.048} color="#ffc678" anchorX="center" anchorY="middle">
+              {label}
+            </Text>
+          </group>
         )}
         {title && (
-          <Text font={displayFont} position={[0, label ? -0.55 : -0.44, 0]} fontSize={0.062} color="#93a3b3" anchorX="center" outlineWidth={0.004} outlineColor="#080b10" maxWidth={0.9} textAlign="center">
+          <Text font={displayFont} position={[0, -(H / 2) - 0.08, 0]} fontSize={0.062} color={video ? '#c7d3de' : '#93a3b3'} anchorX="center" outlineWidth={0.004} outlineColor="#080b10" maxWidth={0.9} textAlign="center">
             {title}
           </Text>
         )}
@@ -669,24 +708,35 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
     return m;
   }, [state.highlight]);
 
-  // The file the agent is reading right now: camera focus + floating pages.
+  // Camera focus: the doc of the most recent hit - the agent's latest find.
   const focusNode = useMemo(() => {
-    const first = state.highlight[0];
-    return first ? nodes.find((n) => n.doc.id === first.docId) ?? null : null;
+    const last = state.highlight[state.highlight.length - 1];
+    return last ? nodes.find((n) => n.doc.id === last.docId) ?? null : null;
   }, [state.highlight, nodes]);
 
+  // Every page the agent pulled this step floats near its document, so the
+  // universe visibly expands on each re-retrieve. Capped for legibility only.
+  const MAX_FLOATING = 8;
   const floatingPages = useMemo(() => {
-    if (!focusNode) return [];
-    const pages = hitByDoc.get(focusNode.doc.id) ?? [];
-    return pages.slice(0, 3)
-      .map((page) => {
-        const pg = focusNode.doc.pages.find((p) => p.page === page);
+    const shown = state.highlight.slice(-MAX_FLOATING);
+    const byDoc = new Map<string, number[]>();
+    for (const h of shown) {
+      if (!byDoc.has(h.docId)) byDoc.set(h.docId, []);
+      byDoc.get(h.docId)!.push(h.page);
+    }
+    const out: { node: (typeof nodes)[number]; page: number; url: string; label?: string; title?: string; index: number; total: number }[] = [];
+    for (const [docId, pages] of byDoc) {
+      const node = nodes.find((n) => n.doc.id === docId);
+      if (!node) continue;
+      pages.forEach((page, index) => {
+        const pg = node.doc.pages.find((p) => p.page === page);
         const ts = pg?.timestamp;
         const label = ts !== undefined ? `${Math.floor(ts / 60)}:${String(ts % 60).padStart(2, '0')}` : undefined;
-        return { page, url: pg?.imageUrl ?? '', label, title: pg ? pageTitle(pg) : undefined };
-      })
-      .filter((p) => p.url);
-  }, [focusNode, hitByDoc]);
+        out.push({ node, page, url: pg?.imageUrl ?? '', label, title: pg ? pageTitle(pg) : undefined, index, total: pages.length });
+      });
+    }
+    return out.filter((p) => p.url);
+  }, [state.highlight, nodes]);
 
   return (
     <>
@@ -735,17 +785,17 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
         </group>
       )}
 
-      {focusNode && floatingPages.map((p, i) => (
+      {floatingPages.map((p) => (
         <FloatingPage
-          key={`${focusNode.doc.id}-${p.page}`}
+          key={`${p.node.doc.id}-${p.page}`}
           url={p.url}
           label={p.label}
           title={p.title}
-          index={i}
-          total={floatingPages.length}
-          anchor={livePos(focusNode)}
-          color={focusNode.color}
-          onClick={() => onOpenPage(focusNode.doc.id, p.page)}
+          index={p.index}
+          total={p.total}
+          anchor={livePos(p.node)}
+          color={p.node.color}
+          onClick={() => onOpenPage(p.node.doc.id, p.page)}
         />
       ))}
 

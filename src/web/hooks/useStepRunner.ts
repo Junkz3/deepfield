@@ -28,6 +28,9 @@ export function useStepRunner(conversationId: string) {
       try {
         const driver = await getDriver(state.driverKind);
         const gen = runStep({ conversation: conv, docs, userInput }, driver);
+        // First hit of the step replaces the previous step's highlight; later
+        // hits accumulate so the universe expands with each re-retrieve.
+        let firstHit = true;
         while (true) {
           const n = await gen.next();
           if (n.done) {
@@ -39,7 +42,10 @@ export function useStepRunner(conversationId: string) {
           if (e.phase === 'retrieve') {
             if (e.hitPages) {
               dispatch({ type: 'set-scanning', scanning: false });
-              if (e.hitPages.length > 0) dispatch({ type: 'set-highlight', pages: e.hitPages });
+              if (e.hitPages.length > 0) {
+                dispatch({ type: firstHit ? 'set-highlight' : 'add-highlight', pages: e.hitPages });
+                firstHit = false;
+              }
             } else {
               dispatch({ type: 'set-scanning', scanning: true });
             }
