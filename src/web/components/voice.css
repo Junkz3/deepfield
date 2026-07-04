@@ -1,0 +1,37 @@
+/* Push-to-talk button in the command bar - same family as .cmdbar-clip,
+   with a recording pulse on the error red and a spinner while Parakeet
+   transcribes. */
+.voice-btn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--text-dim);
+  border: 1px solid transparent;
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+.voice-btn:hover { color: var(--accent); border-color: var(--line-strong); }
+
+.voice-btn.rec {
+  color: var(--err);
+  border-color: var(--err);
+  animation: voice-pulse 1.6s ease-out infinite;
+}
+@keyframes voice-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(240, 113, 106, 0.45); }
+  70% { box-shadow: 0 0 0 9px rgba(240, 113, 106, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(240, 113, 106, 0); }
+}
+
+.voice-btn.busy { color: var(--accent); cursor: default; }
+.voice-spin { animation: voice-rotate 0.9s linear infinite; }
+@keyframes voice-rotate { to { transform: rotate(360deg); } }
+
+.voice-timer {
+  font-size: var(--fs-xs);
+  color: var(--err);
+  min-width: 4ch;
+  text-align: right;
+  letter-spacing: 0.08em;
+}

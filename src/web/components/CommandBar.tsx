@@ -2,6 +2,7 @@
 // One free-form input: ask the agent anything; it searches the universe.
 import { useRef, useState } from 'react';
 import type { Attachment } from '../../agent/types';
+import { VoiceInput } from './VoiceInput';
 import { useApp } from '../store';
 
 const PRESETS = [
@@ -17,7 +18,7 @@ function parse(text: string): { device: string; symptom: string } {
 }
 
 export function CommandBar() {
-  const { dispatch } = useApp();
+  const { state, dispatch } = useApp();
   const [text, setText] = useState('');
   const [photo, setPhoto] = useState<Attachment | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -83,6 +84,7 @@ export function CommandBar() {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
         />
+        <VoiceInput lang={state.lang} onText={(t) => setText((prev) => (prev ? `${prev} ${t}` : t))} />
         <button className="cmdbar-go" onClick={submit} disabled={!text.trim()} title="Start">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M5 12h14M13 6l6 6-6 6" />
