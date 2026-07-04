@@ -1,6 +1,7 @@
 import { LANGS, langName, useApp } from '../store';
 import { VoiceToggle } from './VoiceToggle';
 import { setAgentLanguage } from '../../vultr/client';
+import { setWorkflowProfile } from '../../agent/workflow';
 import './sidebar.css';
 
 /** Galaxy glyph: the agent sun + two orbiting docs, pure SVG, no emoji. */
@@ -24,7 +25,7 @@ export function Sidebar() {
       <div className="sidebar-brand">
         <span className="sidebar-brand-mark" />
         <span className="sidebar-brand-text">
-          RepairCenter
+          {state.workspaceName}
           <span className="sidebar-brand-sub">built on Deepfield</span>
         </span>
       </div>
@@ -106,7 +107,7 @@ export function Sidebar() {
         <button
           className="sidebar-reset mono"
           title="Clear conversations and session files, back to the seeded corpus"
-          onClick={() => dispatch({ type: 'demo-reset' })}
+          onClick={() => { setWorkflowProfile('repair'); dispatch({ type: 'demo-reset' }); }}
         >
           RESET
         </button>

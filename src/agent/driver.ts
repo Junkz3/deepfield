@@ -1,5 +1,8 @@
 import type { Diagnosis, DocType, Page, PageKind, PlanAction, ScoredPage } from './types';
 import { E3_DIAGNOSIS, E3_PLAN, E3_SUFFICIENCY } from './fixtures/e3-case';
+import type { CalibrationInput } from './calibrate';
+import { heuristicProfile } from './calibrate';
+import type { WorkflowProfile } from './workflow';
 import { activeAgents } from './workflow';
 import type { TeamCalibration, TeamCalibrationInput } from './team';
 import { heuristicCalibration } from './team';
@@ -24,6 +27,9 @@ export interface ModelDriver {
   /** Free-form grounded answer (questions and deep dives) - optional; the
    *  loop falls back to the diagnosis pipeline when a driver lacks it. */
   answer?(question: string, evidence: Page[], mode: 'qa' | 'deep'): Promise<string>;
+  /** Deepfield calibration: shape the workflow profile from the dropped
+   *  corpus - optional; callers fall back to the keyword heuristic. */
+  calibrate?(input: CalibrationInput): Promise<WorkflowProfile>;
   /** Team calibration: design 1-3 specialized agents for the corpus and the
    *  user's intent, plus the workspace ops they may request - optional;
    *  callers fall back to the heuristic calibration. */
@@ -113,6 +119,11 @@ export class FakeDriver implements ModelDriver {
         { id: 'safety_notes', args: { operation: 'replace heating element' } },
       ],
     };
+  }
+
+  async calibrate(input: CalibrationInput): Promise<WorkflowProfile> {
+    await this.pace('assessSufficiency');
+    return heuristicProfile(input);
   }
 
   async calibrateTeam(input: TeamCalibrationInput): Promise<TeamCalibration> {

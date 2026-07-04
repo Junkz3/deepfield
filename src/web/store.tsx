@@ -6,6 +6,8 @@ import type { ReactNode } from 'react';
 import type { Attachment, Conversation, Document, GuidedStep } from '../agent/types';
 import { mergeDocs } from '../agent/taxonomy';
 import { presetTeam } from '../agent/team';
+import type { WorkspaceTool } from '../agent/tools';
+import { installWorkspaceOps, TOOL_REGISTRY } from '../agent/tools';
 import type { AgentSpec } from '../agent/workflow';
 import { setWorkflowTeam } from '../agent/workflow';
 import { setAgentLanguage } from '../vultr/client';
@@ -51,8 +53,15 @@ export interface AppState {
   lastBorn: string | null;
   /** technician language: retrieval is multilingual, the agent answers in it */
   lang: Lang;
+  /** Deepfield Studio (?studio): workspace creation screen shown before boot */
+  studioMode: boolean;
+  /** docs fetched during studio mode, held until create-workspace */
+  pendingDocs: Document[];
+  workspaceName: string;
   /** the workspace agent team; the user toggles who is active per request */
   team: AgentSpec[];
+  /** the workspace op registry: shipped repair ops or calibration-written */
+  ops: WorkspaceTool[];
 }
 
 export type Action =
@@ -71,8 +80,11 @@ export type Action =
   | { type: 'ingest-start'; name: string }
   | { type: 'ingest-done'; docId: string | null }
   | { type: 'set-lang'; lang: Lang }
+  | { type: 'create-workspace'; name: string; corpus: Document[]; team?: AgentSpec[] }
   | { type: 'set-team'; team: AgentSpec[] }
+  | { type: 'set-ops'; ops: WorkspaceTool[] }
   | { type: 'toggle-agent'; id: string }
+  | { type: 'studio-preview'; corpus: Document[] }
   | { type: 'demo-reset' };
 
 const LS_KEY = 'rc.conversations';
@@ -86,9 +98,29 @@ function loadConversations(): Conversation[] {
   }
 }
 
-function initialDriverKind(): DriverKind {
-  const p = new URLSearchParams(location.search).get('driver');
-  return p === 'fake' || p === 'vultr' ? p : 'vultr';
+export function initialDriverKind(): DriverKind {
+  try {
+    const p = new URLSearchParams(location.search).get('driver');
+    return p === 'fake' || p === 'vultr' ? p : 'vultr';
+  } catch {
+    return 'vultr';
+  }
+}
+
+function storedLang(): Lang {
+  try {
+    return (localStorage.getItem('rc.lang') as Lang) || 'en';
+  } catch {
+    return 'en';
+  }
+}
+
+function isStudioMode(): boolean {
+  try {
+    return new URLSearchParams(location.search).has('studio');
+  } catch {
+    return false;
+  }
 }
 
 export const initialState: AppState = {
@@ -103,14 +135,49 @@ export const initialState: AppState = {
   lightbox: null,
   ingesting: null,
   lastBorn: null,
-  lang: (localStorage.getItem('rc.lang') as Lang) || 'en',
+  lang: storedLang(),
+  studioMode: isStudioMode(),
+  pendingDocs: [],
+  workspaceName: 'RepairCenter',
   team: presetTeam('repair'),
+  ops: TOOL_REGISTRY,
 };
 
 export function reducer(state: AppState, a: Action): AppState {
   switch (a.type) {
     case 'boot':
+      // Late fetch after create-workspace must not overwrite the chosen corpus.
+      if (state.booted) return state;
+      // Studio mode: hold the corpus, the universe is born on create-workspace.
+      if (state.studioMode) return { ...state, pendingDocs: a.docs };
       return { ...state, booted: true, corpusDocs: a.docs, conversations: loadConversations(), driverKind: initialDriverKind() };
+    case 'studio-preview':
+      // Live preview: the universe behind the Studio card mirrors the corpus
+      // selection. Only meaningful before the workspace exists.
+      if (!state.studioMode) return state;
+      return { ...state, corpusDocs: a.corpus };
+    case 'create-workspace':
+      return {
+        ...state,
+        booted: true,
+        studioMode: false,
+        workspaceName: a.name.trim() || 'RepairCenter',
+        corpusDocs: a.corpus,
+        pendingDocs: [],
+        conversations: loadConversations(),
+        driverKind: initialDriverKind(),
+        team: a.team ?? state.team,
+      };
+    case 'set-team':
+      return { ...state, team: a.team };
+    case 'set-ops':
+      return { ...state, ops: a.ops };
+    case 'toggle-agent': {
+      // At least one agent must stay active: the router needs someone to
+      // hand the request to.
+      const next = state.team.map((t) => (t.id === a.id ? { ...t, active: !t.active } : t));
+      return next.some((t) => t.active) ? { ...state, team: next } : state;
+    }
     case 'add-session-doc':
       return { ...state, sessionDocs: mergeDocs(state.sessionDocs, [a.doc]) };
     case 'open-center':
@@ -159,14 +226,6 @@ export function reducer(state: AppState, a: Action): AppState {
     case 'set-lang':
       localStorage.setItem('rc.lang', a.lang);
       return { ...state, lang: a.lang };
-    case 'set-team':
-      return { ...state, team: a.team };
-    case 'toggle-agent': {
-      // At least one agent must stay active: the router needs someone to
-      // hand the request to.
-      const next = state.team.map((t) => (t.id === a.id ? { ...t, active: !t.active } : t));
-      return next.some((t) => t.active) ? { ...state, team: next } : state;
-    }
     case 'demo-reset':
       localStorage.removeItem(LS_KEY);
       return {
@@ -180,6 +239,7 @@ export function reducer(state: AppState, a: Action): AppState {
         ingesting: null,
         lastBorn: null,
         team: presetTeam('repair'),
+        ops: TOOL_REGISTRY,
       };
     default:
       return state;
@@ -207,6 +267,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setWorkflowTeam(state.team);
   }, [state.team]);
+
+  // The verdict call offers whatever ops the workspace installed.
+  useEffect(() => {
+    installWorkspaceOps(state.ops);
+  }, [state.ops]);
 
   // Boot: load the build-time corpus (absent in early dev = empty galaxy, fine).
   useEffect(() => {

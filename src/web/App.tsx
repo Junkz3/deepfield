@@ -1,10 +1,13 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import type { DragEvent } from 'react';
 import { scopeDocIds } from '../agent/taxonomy';
+import { installWorkspaceOps, TOOL_REGISTRY } from '../agent/tools';
+import { setWorkflowProfile } from '../agent/workflow';
 import { getDriver } from './driver-factory';
 import { ingestFile } from './ingest';
 import { AppProvider, useApp } from './store';
 import { Sidebar } from './components/Sidebar';
+import { DeepfieldStudio } from './components/DeepfieldStudio';
 import { ConversationView } from './components/ConversationView';
 import { CommandBar } from './components/CommandBar';
 import { PageLightbox } from './components/PageLightbox';
@@ -19,6 +22,7 @@ function Shell() {
   const [showTree, setShowTree] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [ingesting, setIngesting] = useState<string | null>(null);
+  const [studioQueue, setStudioQueue] = useState<File[]>([]);
   const inConversation = state.activeView.kind === 'conversation';
 
   const ingestFiles = useCallback(async (files: File[]) => {
@@ -60,6 +64,8 @@ function Shell() {
       if (!e.ctrlKey || !e.shiftKey) return;
       if (e.key.toLowerCase() === 'r') {
         e.preventDefault();
+        setWorkflowProfile('repair');
+        installWorkspaceOps(TOOL_REGISTRY);
         dispatch({ type: 'demo-reset' });
       } else if (e.key.toLowerCase() === 'd') {
         e.preventDefault();
@@ -70,14 +76,24 @@ function Shell() {
     return () => window.removeEventListener('keydown', onKey);
   }, [dispatch, state.driverKind]);
 
+  // Files dropped in the Studio that are not pre-indexed: ingest them once the
+  // workspace is open, so they go through the driver the workspace booted with.
+  useEffect(() => {
+    if (!state.studioMode && studioQueue.length > 0) {
+      const queue = studioQueue;
+      setStudioQueue([]);
+      void ingestFiles(queue);
+    }
+  }, [state.studioMode, studioQueue, ingestFiles]);
+
   return (
     <div className="shell">
-      <Sidebar />
+      {!state.studioMode && <Sidebar />}
       <main
         className={`main stage ${dragging ? 'dragging' : ''}`}
-        onDragOver={(e) => { e.preventDefault(); if (!inConversation) setDragging(true); }}
+        onDragOver={(e) => { e.preventDefault(); if (!inConversation && !state.studioMode) setDragging(true); }}
         onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
-        onDrop={inConversation ? undefined : onDrop}
+        onDrop={inConversation || state.studioMode ? undefined : onDrop}
       >
         {/* The universe is the permanent backdrop of everything. */}
         <Suspense fallback={<div className="galaxy-loading mono">Charting the knowledge universe…</div>}>
@@ -92,7 +108,7 @@ function Shell() {
           />
         </Suspense>
 
-        {!inConversation && (
+        {!inConversation && !state.studioMode && (
           <>
             <button className={`galaxy-tree-toggle btn ${showTree ? 'active' : ''}`} onClick={() => setShowTree(!showTree)}>
               Knowledge tree
@@ -122,12 +138,22 @@ function Shell() {
           </div>
         )}
 
-        {dragging && !inConversation && (
+        {dragging && !inConversation && !state.studioMode && (
           <div className="drop-veil">
             <div className="drop-veil-inner mono">Release to add to the knowledge universe</div>
           </div>
         )}
         {ingesting && <div className="ingest-toast mono fade-up">{ingesting}</div>}
+
+        {/* Studio floats over the live (empty) universe: creation happens in plain sight. */}
+        {state.studioMode && (
+          <DeepfieldStudio
+            onCreate={(name, corpus, liveFiles) => {
+              if (liveFiles.length > 0) setStudioQueue(liveFiles);
+              dispatch({ type: 'create-workspace', name, corpus });
+            }}
+          />
+        )}
 
         <PageLightbox />
       </main>

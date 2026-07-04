@@ -1,10 +1,13 @@
 import type { ClassifyInput, DocMeta, ModelDriver, SufficiencyVerdict } from '../agent/driver';
 import type { Diagnosis, Page, PageKind, PlanAction, ScoredPage } from '../agent/types';
 import { workflowProfile } from '../agent/workflow';
+import type { WorkflowProfile } from '../agent/workflow';
 import { activeAgents } from '../agent/workflow';
 import type { TeamCalibration, TeamCalibrationInput } from '../agent/team';
 import { heuristicCalibration, parseTeamCalibration, teamPrompt } from '../agent/team';
 import { activeTools, opsPromptSection } from '../agent/tools';
+import type { CalibrationInput } from '../agent/calibrate';
+import { calibrationPrompt, heuristicProfile, parseProfile } from '../agent/calibrate';
 
 export type Transport = (path: string, body: unknown) => Promise<any>;
 
@@ -275,6 +278,13 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
       if (d !== fallback) return d;
     }
     return fallback;
+  }
+
+  async calibrate(input: CalibrationInput): Promise<WorkflowProfile> {
+    // Nemotron writes the agent's own configuration from the corpus signal;
+    // any parse failure falls back to the deterministic keyword heuristic.
+    const text = await chatText(this.t, MODELS.omni, [{ type: 'text', text: calibrationPrompt(input) }], 4000);
+    return parseProfile(text) ?? heuristicProfile(input);
   }
 
   async generateProbe(page: { page: number; text: string }): Promise<{ question: string; mustContain: string[] } | null> {
