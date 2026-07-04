@@ -5,6 +5,7 @@ import type { Citation, GuidedStep } from '../../agent/types';
 import { useStepRunner } from '../hooks/useStepRunner';
 import { useApp } from '../store';
 import { AgentDock } from './AgentDock';
+import { VoiceInput } from './VoiceInput';
 import { Timeline } from './Timeline';
 import { WorkOrderView } from './WorkOrderView';
 import './conversation.css';
@@ -212,6 +213,7 @@ export function ConversationView({ id }: { id: string }) {
 }
 
 function FreeReply({ disabled, onSend }: { disabled: boolean; onSend: (text: string) => void }) {
+  const { state } = useApp();
   const [text, setText] = useState('');
   const submit = () => {
     if (!text.trim() || disabled) return;
@@ -226,6 +228,11 @@ function FreeReply({ disabled, onSend }: { disabled: boolean; onSend: (text: str
         disabled={disabled}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && submit()}
+      />
+      <VoiceInput
+        lang={state.lang}
+        onText={(t) => setText((prev) => (prev ? `${prev} ${t}` : t))}
+        onSubmit={(t) => (disabled ? setText((prev) => (prev ? `${prev} ${t}` : t)) : onSend(t))}
       />
       <button className="btn" onClick={submit} disabled={disabled || !text.trim()} title="Send">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
