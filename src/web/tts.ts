@@ -1,8 +1,10 @@
 // Voice of the agent - the final verdict is read aloud in the technician's
-// language. TTS runs on Vultr Serverless Inference (xtts, multilingual) through
-// the /api/agent proxy; any failure falls back to the browser's speechSynthesis
-// so the demo beat survives a service outage. Fire-and-forget: no TTS error may
-// ever reach the timeline or delay the result render. Cached per (text, lang).
+// language. Chain: NVIDIA Magpie TTS via the local relay (tools/tts-relay,
+// gRPC-only hosted API bridged to localhost HTTP - reachable when the demo
+// runs on vite preview), then Vultr TTS (xtts) through the /api/agent proxy,
+// then the browser's speechSynthesis so the beat survives any outage.
+// Fire-and-forget: no TTS error may ever reach the timeline or delay the
+// result render. Cached per (source, text, lang).
 import type { Lang } from './store';
 
 /** Coqui XTTS v2 language coverage (the model Vultr serves); others speak English. */
@@ -92,8 +94,29 @@ function defaultSpeakBrowser(text: string, lang: Lang): boolean {
   return true;
 }
 
+/** Local bridge to NVIDIA's hosted Magpie TTS (gRPC-only upstream). Off in
+ *  prod: the fetch fails in milliseconds and the chain moves on to Vultr. */
+export const NVIDIA_RELAY_URL = 'http://127.0.0.1:8123';
+
+async function synthesizeNvidia(text: string, lang: Lang, fetchFn: typeof fetch): Promise<Blob> {
+  const key = `nvidia/${lang}/${text}`;
+  const hit = blobCache.get(key);
+  if (hit) return hit;
+  const res = await fetchFn(`${NVIDIA_RELAY_URL}/tts`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ text, lang }),
+    signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(15_000) : undefined,
+  });
+  if (!res.ok) throw new Error(`nvidia relay ${res.status}`);
+  const blob = await res.blob();
+  if (blob.size === 0) throw new Error('nvidia relay: empty audio');
+  blobCache.set(key, blob);
+  return blob;
+}
+
 async function synthesizeVultr(text: string, lang: Lang, fetchFn: typeof fetch): Promise<Blob> {
-  const key = `${lang}/${text}`;
+  const key = `vultr/${lang}/${text}`;
   const hit = blobCache.get(key);
   if (hit) return hit;
   const res = await fetchFn('/api/agent', {
@@ -132,7 +155,7 @@ export async function speakVerdict(
   lang: Lang,
   driverKind: 'fake' | 'vultr',
   deps?: Partial<TtsDeps>,
-): Promise<'vultr' | 'browser' | 'silent'> {
+): Promise<'nvidia' | 'vultr' | 'browser' | 'silent'> {
   const d: TtsDeps = {
     fetchFn: deps?.fetchFn ?? fetch,
     play: deps?.play ?? defaultPlay,
@@ -142,6 +165,12 @@ export async function speakVerdict(
   const spoken = speechText(text);
   if (!spoken) return 'silent';
   if (driverKind === 'vultr') {
+    try {
+      d.play(await synthesizeNvidia(spoken, lang, d.fetchFn));
+      return 'nvidia';
+    } catch (err) {
+      console.warn('[tts] NVIDIA relay unavailable, trying Vultr:', err);
+    }
     try {
       d.play(await synthesizeVultr(spoken, lang, d.fetchFn));
       return 'vultr';

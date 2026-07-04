@@ -9,12 +9,21 @@ const audioResponse = (blob: Blob) => ({
   blob: async () => blob,
 }) as unknown as Response;
 
+/** Default double: NVIDIA relay down (connection refused), Vultr healthy. */
+const relayDownFetch = () => vi.fn(async (url: RequestInfo | URL) => {
+  if (String(url).includes('127.0.0.1:8123')) throw new TypeError('fetch failed');
+  return audioResponse(new Blob(['x']));
+}) as unknown as typeof fetch;
+
 const deps = (over: Partial<Parameters<typeof speakVerdict>[3]> = {}) => ({
-  fetchFn: vi.fn(async () => audioResponse(new Blob(['x']))) as unknown as typeof fetch,
+  fetchFn: relayDownFetch(),
   play: vi.fn(),
   speakBrowser: vi.fn(() => true),
   ...over,
 });
+
+const callsTo = (fn: unknown, host: string) =>
+  (fn as ReturnType<typeof vi.fn>).mock.calls.filter((c) => String(c[0]).includes(host)).length;
 
 describe('speechText', () => {
   it('strips page citations and markdown, collapses whitespace', () => {
@@ -48,26 +57,36 @@ describe('xttsLang', () => {
 });
 
 describe('speakVerdict', () => {
-  it('vultr: synthesizes through the proxy and plays the blob', async () => {
+  it('nvidia relay first when reachable, vultr proxy untouched', async () => {
+    __resetTtsCacheForTests();
+    const d = deps({ fetchFn: vi.fn(async () => audioResponse(new Blob(['x']))) as unknown as typeof fetch });
+    const out = await speakVerdict('Replace the heater.', 'en', 'vultr', d);
+    expect(out).toBe('nvidia');
+    expect(callsTo(d.fetchFn, '127.0.0.1:8123')).toBe(1);
+    expect(callsTo(d.fetchFn, '/api/agent')).toBe(0);
+    expect(d.play).toHaveBeenCalledTimes(1);
+  });
+
+  it('relay down: synthesizes through the vultr proxy and plays the blob', async () => {
     __resetTtsCacheForTests();
     const d = deps();
     const out = await speakVerdict('Replace the heater.', 'en', 'vultr', d);
     expect(out).toBe('vultr');
-    expect(d.fetchFn).toHaveBeenCalledTimes(1);
+    expect(callsTo(d.fetchFn, '/api/agent')).toBe(1);
     expect(d.play).toHaveBeenCalledTimes(1);
     expect(d.speakBrowser).not.toHaveBeenCalled();
   });
 
-  it('vultr: caches per (text, lang) - second call does not fetch', async () => {
+  it('vultr: caches per (text, lang) - second call does not refetch the proxy', async () => {
     __resetTtsCacheForTests();
     const d = deps();
     await speakVerdict('Replace the heater.', 'en', 'vultr', d);
     await speakVerdict('Replace the heater.', 'en', 'vultr', d);
-    expect(d.fetchFn).toHaveBeenCalledTimes(1);
+    expect(callsTo(d.fetchFn, '/api/agent')).toBe(1);
     expect(d.play).toHaveBeenCalledTimes(2);
   });
 
-  it('vultr: falls back to the browser voice when the service fails', async () => {
+  it('everything down: falls back to the browser voice', async () => {
     __resetTtsCacheForTests();
     const d = deps({
       fetchFn: vi.fn(async () => ({ ok: false, status: 500, text: async () => 'err' }) as unknown as Response) as unknown as typeof fetch,
