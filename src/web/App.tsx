@@ -4,13 +4,14 @@ import { scopeDocIds } from '../agent/taxonomy';
 import { installWorkspaceOps, TOOL_REGISTRY } from '../agent/tools';
 import { setWorkflowProfile } from '../agent/workflow';
 import { getDriver } from './driver-factory';
-import { ingestFile } from './ingest';
+import { deepenDocument, ingestFile } from './ingest';
 import { AppProvider, useApp } from './store';
 import { Sidebar } from './components/Sidebar';
 import { DeepfieldStudio } from './components/DeepfieldStudio';
 import { ConversationView } from './components/ConversationView';
 import { CommandBar } from './components/CommandBar';
 import { PageLightbox } from './components/PageLightbox';
+import { SelfCheckPanel } from './components/SelfCheckPanel';
 import { TreePanel } from './components/TreePanel';
 import './app.css';
 import './components/galaxy.css';
@@ -23,6 +24,7 @@ function Shell() {
   const [dragging, setDragging] = useState(false);
   const [ingesting, setIngesting] = useState<string | null>(null);
   const [studioQueue, setStudioQueue] = useState<File[]>([]);
+  const [checkDocIds, setCheckDocIds] = useState<string[]>([]);
   const inConversation = state.activeView.kind === 'conversation';
 
   const ingestFiles = useCallback(async (files: File[]) => {
@@ -35,6 +37,13 @@ function Shell() {
         const doc = await ingestFile(file, driver);
         dispatch({ type: 'add-session-doc', doc });
         dispatch({ type: 'ingest-done', docId: doc.id });
+        // Deepen in the background: the remaining pages render batch by batch
+        // and join the constellation live - a dropped 88-page policy becomes
+        // as searchable as a built corpus, without blocking the drop.
+        void deepenDocument(file, doc, driver, (docId, pages) =>
+          dispatch({ type: 'extend-session-doc', docId, pages }),
+        ).catch(() => { /* deepening is best-effort; the first pages already landed */ });
+        setCheckDocIds((prev) => (prev.includes(doc.id) ? prev : [...prev, doc.id]));
         setIngesting(`Filed under ${doc.category} / ${doc.brand} ${doc.model}`);
         setTimeout(() => setIngesting(null), 2600);
       } catch (err) {
@@ -144,6 +153,10 @@ function Shell() {
           </div>
         )}
         {ingesting && <div className="ingest-toast mono fade-up">{ingesting}</div>}
+
+        {checkDocIds.length > 0 && !inConversation && !state.studioMode && (
+          <SelfCheckPanel docIds={checkDocIds} onClose={() => setCheckDocIds([])} />
+        )}
 
         {/* Studio floats over the live (empty) universe: creation happens in plain sight. */}
         {state.studioMode && (

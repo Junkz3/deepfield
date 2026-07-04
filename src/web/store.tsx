@@ -3,7 +3,7 @@
 // live here, conversations persisted to localStorage.
 import { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
 import type { ReactNode } from 'react';
-import type { Attachment, Conversation, Document, GuidedStep } from '../agent/types';
+import type { Attachment, Conversation, Document, GuidedStep, Page } from '../agent/types';
 import { mergeDocs } from '../agent/taxonomy';
 import { presetTeam } from '../agent/team';
 import type { WorkspaceTool } from '../agent/tools';
@@ -67,6 +67,7 @@ export interface AppState {
 export type Action =
   | { type: 'boot'; docs: Document[] }
   | { type: 'add-session-doc'; doc: Document }
+  | { type: 'extend-session-doc'; docId: string; pages: Page[] }
   | { type: 'open-center' }
   | { type: 'open-conversation'; id: string }
   | { type: 'new-conversation'; id: string; device: string; symptom: string; attachments: Attachment[] }
@@ -180,6 +181,13 @@ export function reducer(state: AppState, a: Action): AppState {
     }
     case 'add-session-doc':
       return { ...state, sessionDocs: mergeDocs(state.sessionDocs, [a.doc]) };
+    case 'extend-session-doc':
+      // Background deepening: new page batches join the live document.
+      return {
+        ...state,
+        sessionDocs: state.sessionDocs.map((d) =>
+          d.id === a.docId ? { ...d, pages: [...d.pages, ...a.pages.filter((p) => !d.pages.some((x) => x.page === p.page))] } : d),
+      };
     case 'open-center':
       return { ...state, activeView: { kind: 'center' } };
     case 'open-conversation': {
