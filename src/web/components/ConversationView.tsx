@@ -8,8 +8,32 @@ import { Timeline } from './Timeline';
 import { WorkOrderView } from './WorkOrderView';
 import './conversation.css';
 
+/** Minimal renderer for grounded answers: ## headings, - bullets, paragraphs. */
+function AnswerBlock({ text }: { text: string }) {
+  const blocks = text.split(/\n{2,}/);
+  return (
+    <div className="step-answer">
+      {blocks.map((b, i) => {
+        const lines = b.split('\n');
+        if (lines.every((l) => /^\s*[-*]\s+/.test(l))) {
+          return <ul key={i}>{lines.map((l, j) => <li key={j}>{l.replace(/^\s*[-*]\s+/, '')}</li>)}</ul>;
+        }
+        if (/^#{1,4}\s+/.test(lines[0])) {
+          return (
+            <div key={i}>
+              <h4>{lines[0].replace(/^#{1,4}\s+/, '')}</h4>
+              {lines.length > 1 && <p>{lines.slice(1).join(' ')}</p>}
+            </div>
+          );
+        }
+        return <p key={i}>{b}</p>;
+      })}
+    </div>
+  );
+}
+
 const isAction = (t: string) =>
-  /^(report-measurement:|find-video$|order-part:|show-citation:|compile-work-order$|open-ingest$)/.test(t);
+  /^(report-measurement:|find-video$|order-part:|show-citation:|compile-work-order$|open-ingest$|explain-deep$)/.test(t);
 
 function ConfidenceMeter({ value, reason }: { value: number; reason: string }) {
   const color = value >= 0.7 ? 'var(--ok)' : value >= 0.4 ? 'var(--warn)' : 'var(--err)';
@@ -63,7 +87,7 @@ function StepCard({ step, isLast, onAction, onOpenCite, onOpenPage }: {
         <span className="step-status mono" style={{ color: statusColor }}>{step.status.toUpperCase()}</span>
       </header>
       <Timeline events={step.phaseEvents} running={false} onOpenPage={onOpenPage} />
-      <p className="step-instruction">{step.instruction}</p>
+      {step.answer ? <AnswerBlock text={step.answer} /> : <p className="step-instruction">{step.instruction}</p>}
       <CiteChips citations={step.citations} onOpen={onOpenCite} />
       <ConfidenceMeter value={step.confidence} reason={step.confidenceReason} />
       {isLast && step.proposedNext.length > 0 && (

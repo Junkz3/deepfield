@@ -128,6 +128,33 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     };
   }
 
+  // QUESTION intent: informational asks deserve a full grounded ANSWER, not
+  // a diagnosis mold. Same retrieval, free-form cited prose out.
+  const deepDive = userInput === 'explain-deep';
+  if ((plan.intent === 'question' || deepDive) && driver.answer) {
+    yield emit({ phase: 'reason', summary: deepDive ? 'Re-reading the cited pages in depth' : 'Reading the pages to answer' });
+    const questionText = deepDive
+      ? `Explain in depth: ${conversation.symptom} (device: ${conversation.device})`
+      : (userInput && !/^(report-measurement:|find-video$|order-part:|show-citation:|compile-work-order$|open-ingest$|explain-deep$)/.test(userInput) ? userInput : `${conversation.device}: ${conversation.symptom}`);
+    const bestFirst = [...retrieved].sort((a, b) => b.score - a.score);
+    const text = await driver.answer(questionText, bestFirst.map((r) => r.page), deepDive ? 'deep' : 'qa');
+    const citations = retrieved.map(toCitation);
+    const distinct = Math.max(new Set(retrieved.map((r) => r.page.docId)).size, new Set(retrieved.map((r) => r.page.kind)).size);
+    const conf = computeConfidence({ exactCodeMatch: false, corroboratingCitations: distinct - 1, requiredPageMissing: evidenceIncomplete });
+    yield emit({ phase: 'decide', summary: 'Answer grounded in the cited pages' });
+    return {
+      index: conversation.steps.length, phaseEvents: events,
+      instruction: text.split('\n')[0].slice(0, 200),
+      answer: text,
+      citations,
+      proposedNext: [
+        { label: 'Explain in depth', action: 'explain-deep' },
+        { label: 'Compile work order', action: 'compile-work-order' },
+      ],
+      confidence: conf.value, confidenceReason: conf.reason, status: 'ok',
+    };
+  }
+
   // REASON (multimodal)
   yield emit({ phase: 'reason', summary: 'Reading the retrieved pages' + (conversation.attachments.length > 0 ? ' and your photo' : '') });
   const diagnosis = await driver.diagnose(q, retrieved.map((r) => r.page), conversation.attachments[0]?.dataUrl);
@@ -217,13 +244,14 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   const hasVideo = candidates.some((p) => p.kind === 'video-segment');
   if (hasVideo) proposedNext.push({ label: 'Show me the replacement video', action: 'find-video' });
   if (citations.length > 1) proposedNext.push({ label: 'Show the corroborating page', action: 'show-citation:1' });
+  proposedNext.push({ label: 'Explain in depth', action: 'explain-deep' });
   proposedNext.push({ label: 'Compile work order', action: 'compile-work-order' });
 
   return {
     index: conversation.steps.length, phaseEvents: events,
     instruction: diagnosis.instruction ?? `${diagnosis.cause} First: ${diagnosis.checks[0]}.`,
     citations,
-    proposedNext: proposedNext.slice(0, 4),
+    proposedNext: proposedNext.slice(0, 5),
     confidence: conf.value, confidenceReason: conf.reason, status: 'ok',
     diagnosis, parts: [part], safety,
   };

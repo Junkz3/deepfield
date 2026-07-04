@@ -791,3 +791,25 @@
 .cite-lightbox.docked .video-frame {
   width: min(100%, calc(72vh * 16 / 9));
 }
+
+/* ---- Grounded free-form answers (Q&A and deep dives) ---- */
+
+.step-answer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-left: 2px solid var(--accent-dim);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  font-size: var(--fs-md);
+  line-height: 1.65;
+}
+.step-answer h4 {
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+}
+.step-answer ul { padding-left: 1.1em; display: flex; flex-direction: column; gap: 4px; }

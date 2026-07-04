@@ -77,8 +77,27 @@ export class VultrDriver implements ModelDriver {
       ? 'Show the video walkthrough for this repair. Phrase the retrieval query as: video walkthrough <device> <faulty component> replacement.'
       : q.userInput;
     const text = await chatText(this.t, MODELS.omni,
-      `You are a repair agent planning evidence retrieval from a knowledge base that holds PAGINATED MANUAL PAGES and TIMESTAMPED VIDEO WALKTHROUGH SEGMENTS.\nDevice: ${q.device}\nSymptom: ${q.symptom}\nUser input: ${userInput ?? 'none'}\nThis is quick planning, not analysis: keep any internal reasoning under 30 words. Return STRICT JSON: {"goal": string, "queries": [string]} - one focused retrieval query (error code table / troubleshooting first; start the query with "video walkthrough" when the user wants a demonstration). The retrieval query MUST be written in English (the corpus language) regardless of the user's language; write the goal in ${AGENT_LANG}.`, 8000);
+      `You are a repair agent planning evidence retrieval from a knowledge base that holds PAGINATED MANUAL PAGES and TIMESTAMPED VIDEO WALKTHROUGH SEGMENTS.\nDevice: ${q.device}\nSymptom: ${q.symptom}\nUser input: ${userInput ?? 'none'}\nThis is quick planning, not analysis: keep any internal reasoning under 30 words. Return STRICT JSON: {"goal": string, "queries": [string], "intent": "diagnose"|"question"} - intent is "diagnose" for faults/symptoms to troubleshoot, "question" for how-to, maintenance, specs or informational asks; one focused retrieval query (error code table / troubleshooting first; start the query with "video walkthrough" when the user wants a demonstration). The retrieval query MUST be written in English (the corpus language) regardless of the user's language; write the goal in ${AGENT_LANG}.`, 8000);
     return extractJson<PlanAction>(text, { goal: `Diagnose ${q.symptom}`, queries: [`${q.device} ${q.symptom}`] });
+  }
+
+  async answer(question: string, evidence: Page[], mode: 'qa' | 'deep'): Promise<string> {
+    const depth = mode === 'deep'
+      ? 'Give the COMPLETE picture: explain the reasoning, the relevant values, the alternatives and the pitfalls the pages mention. Use short markdown sections. Aim for thorough - several paragraphs are welcome.'
+      : 'Answer fully but stay on the question. Use short paragraphs or a list when the pages give steps.';
+    const shown = evidence.slice(0, 4);
+    const pageList = shown.map((pg) => `p.${pg.page}`).join(', ');
+    const parts: unknown[] = [{ type: 'text', text: `You are a technical assistant answering from the attached manual pages ONLY. Question: ${question}
+Attached pages, in this order: ${pageList}.
+${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque values EXACTLY as printed; cite pages by their REAL numbers from the list above, like (${shown[0] ? `p.${shown[0].page}` : 'p.12'}), after each fact. If the pages do not contain the answer, say exactly what is missing. Keep any internal reasoning under 60 words, then write the answer.` }];
+    for (const p of shown) parts.push({ type: 'image_url', image_url: { url: await toDataUrl(p.imageUrl) } });
+    // Degressive like diagnose: dense pages can burn the reasoning cap.
+    for (const take of [4, 2, 1]) {
+      const attempt = [parts[0], ...parts.slice(1, 1 + take)];
+      const text = (await chatText(this.t, MODELS.omni, attempt, 8000)).trim();
+      if (text) return text;
+    }
+    return 'The pages could not be read into an answer - try rephrasing the question.';
   }
 
   async retrieve(query: string, candidates: Page[]): Promise<ScoredPage[]> {

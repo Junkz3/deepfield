@@ -11,6 +11,9 @@ export interface ModelDriver {
   assessSufficiency(q: { device: string; symptom: string }, found: ScoredPage[]): Promise<SufficiencyVerdict>;
   diagnose(q: { device: string; symptom: string }, evidence: Page[], techPhoto?: string): Promise<Diagnosis>;
   classify(input: ClassifyInput): Promise<DocMeta>;
+  /** Free-form grounded answer (questions and deep dives) - optional; the
+   *  loop falls back to the diagnosis pipeline when a driver lacks it. */
+  answer?(question: string, evidence: Page[], mode: 'qa' | 'deep'): Promise<string>;
 }
 
 const BASE_MS = { plan: 2000, retrieve: 4000, assessSufficiency: 1500, diagnose: 6000, classify: 3000 } as const;
