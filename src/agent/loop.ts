@@ -59,6 +59,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
 
   // RETRIEVE (driven by sufficiency, max 3)
   const candidates = candidatePages(docs, conversation.device);
+  const videoIntent = userInput === 'find-video' || /video|walkthrough/i.test(userInput ?? '');
   let retrieved: ScoredPage[] = [];
   let query = plan.queries[0] ?? `${conversation.device} ${conversation.symptom}`;
   for (let round = 0; round < 3; round++) {
@@ -73,10 +74,29 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     });
     retrieved.push(...top.filter((t) => !retrieved.some((r) => r.page.docId === t.page.docId && r.page.page === t.page.page)));
     if (retrieved.length === 0) break;
+    if (videoIntent && retrieved.some((r) => r.page.kind === 'video-segment')) break; // media step: no depth needed
     const verdict = await driver.assessSufficiency(q, retrieved);
     if (verdict.sufficient || !verdict.followupQuery) break;
     yield emit({ phase: 'retrieve', summary: 'Evidence insufficient - retrieving again', detail: verdict.reason });
     query = verdict.followupQuery;
+  }
+
+  // MEDIA step: the user asked for the video, the diagnosis already exists.
+  // Deliver the timestamped segments directly - no re-diagnosis pass.
+  const videoHits = retrieved.filter((r) => r.page.kind === 'video-segment');
+  if (videoIntent && videoHits.length > 0) {
+    const citations = videoHits.map(toCitation);
+    const conf = computeConfidence({ exactCodeMatch: false, corroboratingCitations: citations.length - 1, requiredPageMissing: false });
+    yield emit({ phase: 'decide', summary: `Video walkthrough: ${videoHits.length} segment(s) at their exact seconds` });
+    return {
+      index: conversation.steps.length, phaseEvents: events,
+      instruction: `Video walkthrough found. ${videoHits.length} step(s) cited at their exact timestamps - click a segment to play it at the right second.`,
+      citations,
+      proposedNext: [
+        { label: 'Compile work order', action: 'compile-work-order' },
+      ],
+      confidence: conf.value, confidenceReason: conf.reason, status: 'ok',
+    };
   }
 
   // NO EVIDENCE guardrail
@@ -109,8 +129,9 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   const conf = computeConfidence({ exactCodeMatch, corroboratingCitations: citations.length - 1, requiredPageMissing: false });
   yield emit({ phase: 'decide', summary: `First check: ${diagnosis.checks[0]}` });
 
-  // Proposed actions follow the DIAGNOSIS, not a fixed script.
-  const component = diagnosis.component.toLowerCase();
+  // Proposed actions follow the DIAGNOSIS, not a fixed script. The machine
+  // key stays English even when the display language does not.
+  const component = `${diagnosis.componentKey ?? ''} ${diagnosis.component}`.toLowerCase();
   const proposedNext: { label: string; action: string }[] = [];
   if (component.includes('heat')) {
     proposedNext.push(

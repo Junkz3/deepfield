@@ -204,8 +204,11 @@ export function PageLightbox() {
               drag.current = { x: e.clientX, y: e.clientY, tx: zoom.tx, ty: zoom.ty };
             }}
             onMouseMove={(e) => {
-              if (!drag.current) return;
-              setZoom((z) => ({ ...z, tx: drag.current!.tx + e.clientX - drag.current!.x, ty: drag.current!.ty + e.clientY - drag.current!.y }));
+              const d = drag.current;
+              if (!d) return;
+              const tx = d.tx + e.clientX - d.x;
+              const ty = d.ty + e.clientY - d.y;
+              setZoom((z) => ({ ...z, tx, ty }));
             }}
             onMouseUp={() => { drag.current = null; }}
             onMouseLeave={() => { drag.current = null; }}
