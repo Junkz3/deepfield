@@ -59,7 +59,7 @@
     {
       "id": "hmmwv-tm-9-2320-387-24-1",
       "file": "hmmwv-tm-9-2320-387-24-1.pdf",
-      "pages": "155-160,535-545,1661-1700",
+      "pages": "150-170,500-620,1640-1704",
       "category": "vehicle",
       "brand": "AM General",
       "model": "M1151 HMMWV",
@@ -108,7 +108,7 @@
     {
       "id": "ifixit-iphone-se-battery",
       "file": "ifixit-iphone-se-battery.pdf",
-      "pages": "all",
+      "pages": "1-28",
       "category": "smartphone",
       "brand": "Apple",
       "model": "iPhone SE 2020",
@@ -119,7 +119,7 @@
     {
       "id": "ifixit-joycon",
       "file": "ifixit-joycon.pdf",
-      "pages": "all",
+      "pages": "1-11",
       "category": "game console",
       "brand": "Nintendo",
       "model": "Switch Joy-Con",
@@ -130,7 +130,7 @@
     {
       "id": "ifixit-keurig-pump",
       "file": "ifixit-keurig-pump.pdf",
-      "pages": "all",
+      "pages": "1-5",
       "category": "coffee machine",
       "brand": "Keurig",
       "model": "K-Duo",
@@ -141,7 +141,7 @@
     {
       "id": "lg-washer",
       "file": "lg-washer.pdf",
-      "pages": "1-40",
+      "pages": "1-63",
       "category": "washing machine",
       "brand": "LG",
       "model": "F4WV5",
@@ -152,7 +152,7 @@
     {
       "id": "delonghi-ec9355",
       "file": "delonghi-ec9355.pdf",
-      "pages": "all",
+      "pages": "1-25",
       "category": "coffee machine",
       "brand": "DeLonghi",
       "model": "EC9355",
@@ -169,7 +169,7 @@
     {
       "id": "mil-generator-mep803a-operator",
       "file": "mil-generator-mep803a-operator.pdf",
-      "pages": "1-6,67-69",
+      "pages": "1-137",
       "category": "generator",
       "brand": "US Army (Onan)",
       "model": "MEP-803A / MEP-813A 10kW Tactical Quiet Generator (TM 9-6115-642-10)",
@@ -180,18 +180,34 @@
     {
       "id": "mil-generator-mep803a-maintenance",
       "file": "mil-generator-mep803a-maintenance.pdf",
-      "pages": "1-6,145-147",
+      "pages": "1-293",
       "category": "generator",
       "brand": "US Army (Onan)",
       "model": "MEP-803A / MEP-813A 10kW Tactical Quiet Generator (TM 9-6115-642-24)",
       "docType": "service",
       "sourceRights": "US Government work, public domain (17 USC 105), via liberatedmanuals.com",
-      "kinds": {}
+      "kinds": {
+        "53": "troubleshooting",
+        "54": "troubleshooting",
+        "55": "troubleshooting",
+        "56": "troubleshooting",
+        "57": "troubleshooting",
+        "58": "troubleshooting",
+        "59": "troubleshooting",
+        "60": "troubleshooting",
+        "61": "troubleshooting",
+        "62": "troubleshooting",
+        "63": "troubleshooting",
+        "64": "troubleshooting",
+        "65": "troubleshooting",
+        "66": "troubleshooting",
+        "67": "troubleshooting"
+      }
     },
     {
       "id": "mil-refrigerator-adr300",
       "file": "mil-refrigerator-adr300.pdf",
-      "pages": "1-6,179-181",
+      "pages": "1-361",
       "category": "refrigerator",
       "brand": "US Army",
       "model": "ADR-300 Advanced Design Refrigerator, 300 cu ft (TM 10-4110-262-13&P)",
@@ -202,7 +218,7 @@
     {
       "id": "mil-air-conditioner-18kbtu",
       "file": "mil-air-conditioner-18kbtu.pdf",
-      "pages": "1-6,84-86",
+      "pages": "1-171",
       "category": "hvac",
       "brand": "US Army (Trane / Hottel / AAF)",
       "model": "18,000 BTU horizontal compact air conditioner (TM 5-4120-243-14)",
@@ -213,7 +229,7 @@
     {
       "id": "mil-water-heater-m80-m85",
       "file": "mil-water-heater-m80-m85.pdf",
-      "pages": "1-6,173-175",
+      "pages": "1-349",
       "category": "water heater",
       "brand": "US Army",
       "model": "M-80 / M-85 liquid-fuel water heater (TM 10-4520-259-13&P)",
@@ -224,7 +240,7 @@
     {
       "id": "mil-outboard-motor-omc-am40a",
       "file": "mil-outboard-motor-omc-am40a.pdf",
-      "pages": "1-6,106-108",
+      "pages": "1-214",
       "category": "outboard motor",
       "brand": "OMC (US Army)",
       "model": "AM-40A gasoline outboard motor (TM 5-2805-261-13)",
@@ -235,7 +251,7 @@
     {
       "id": "mil-forklift-electric-baker",
       "file": "mil-forklift-electric-baker.pdf",
-      "pages": "1-6,87-89",
+      "pages": "1-177",
       "category": "forklift",
       "brand": "Baker (US Army)",
       "model": "Electric solid-rubber-tire fork lift truck MHE (TM 10-3930-615-15)",
@@ -246,7 +262,7 @@
     {
       "id": "mil-arc-welder-sa135",
       "file": "mil-arc-welder-sa135.pdf",
-      "pages": "1-6",
+      "pages": "1-74",
       "category": "welder",
       "brand": "Westinghouse (US Army)",
       "model": "SA-135 inert-gas shielded arc welding set (TM 5-3431-200-15)",
@@ -257,7 +273,7 @@
     {
       "id": "ifixit-roomba-960-battery",
       "file": "ifixit-roomba-960-battery.pdf",
-      "pages": "all",
+      "pages": "1-4",
       "category": "vacuum robot",
       "brand": "iRobot",
       "model": "Roomba 960 (iFixit guide 78745, battery replacement)",
@@ -268,7 +284,7 @@
     {
       "id": "ifixit-dewalt-dw235g-power-cord",
       "file": "ifixit-dewalt-dw235g-power-cord.pdf",
-      "pages": "all",
+      "pages": "1-4",
       "category": "power tool",
       "brand": "DeWalt",
       "model": "DW235G drill (iFixit guide 168074, power cord replacement)",
@@ -279,29 +295,66 @@
     {
       "id": "epson-et2800-user-guide",
       "file": "epson-et2800-user-guide.pdf",
-      "pages": "1-6,125-127",
+      "pages": "1-253",
       "category": "printer",
       "brand": "Epson",
       "model": "EcoTank ET-2800 / ET-2803",
       "docType": "user",
       "sourceRights": "Manufacturer-published on files.support.epson.com",
-      "kinds": {}
+      "kinds": {
+        "187": "error-table",
+        "188": "error-table",
+        "189": "troubleshooting",
+        "190": "troubleshooting",
+        "191": "troubleshooting",
+        "192": "troubleshooting",
+        "202": "troubleshooting",
+        "203": "troubleshooting",
+        "204": "troubleshooting",
+        "205": "troubleshooting",
+        "206": "troubleshooting",
+        "215": "troubleshooting",
+        "216": "troubleshooting",
+        "217": "troubleshooting",
+        "218": "troubleshooting",
+        "219": "troubleshooting",
+        "220": "troubleshooting",
+        "221": "troubleshooting"
+      }
     },
     {
       "id": "brother-hll2350dw-user-guide",
       "file": "brother-hll2350dw-user-guide.pdf",
-      "pages": "1-6,117-119",
+      "pages": "1-236",
       "category": "printer",
       "brand": "Brother",
       "model": "HL-L2350DW (also HL-L2325DW/L2370DW/L2390DW) laser printer",
       "docType": "user",
       "sourceRights": "Manufacturer-published on download.brother.com",
-      "kinds": {}
+      "kinds": {
+        "148": "error-table",
+        "149": "error-table",
+        "150": "error-table",
+        "152": "troubleshooting",
+        "153": "troubleshooting",
+        "154": "troubleshooting",
+        "155": "troubleshooting",
+        "156": "troubleshooting",
+        "157": "troubleshooting",
+        "158": "troubleshooting",
+        "159": "troubleshooting",
+        "160": "troubleshooting",
+        "162": "troubleshooting",
+        "163": "troubleshooting",
+        "164": "troubleshooting",
+        "165": "troubleshooting",
+        "166": "troubleshooting"
+      }
     },
     {
       "id": "toro-recycler-22-operator",
       "file": "toro-recycler-22-operator.pdf",
-      "pages": "1-6",
+      "pages": "1-20",
       "category": "lawn mower",
       "brand": "Toro",
       "model": "22in Recycler, models 20372/20374 (Form 3371-612)",
@@ -312,7 +365,7 @@
     {
       "id": "yamaha-rxv385-owners-manual",
       "file": "yamaha-rxv385-owners-manual.pdf",
-      "pages": "1-6",
+      "pages": "1-112",
       "category": "av receiver",
       "brand": "Yamaha",
       "model": "RX-V385 5.1ch AV receiver",
@@ -323,40 +376,57 @@
     {
       "id": "panasonic-nnsn686s-owners-manual",
       "file": "panasonic-nnsn686s-owners-manual.pdf",
-      "pages": "1-6",
+      "pages": "1-28",
       "category": "microwave",
       "brand": "Panasonic",
       "model": "NN-SN686S / NN-SN67HS inverter microwave",
       "docType": "user",
       "sourceRights": "Manufacturer-published on help.na.panasonic.com",
-      "kinds": {}
+      "kinds": {
+        "19": "troubleshooting"
+      }
     },
     {
       "id": "avm-fritzbox-7590-manual",
       "file": "avm-fritzbox-7590-manual.pdf",
-      "pages": "1-6,157-159",
+      "pages": "1-317",
       "category": "router",
       "brand": "AVM",
       "model": "FRITZ!Box 7590 DSL router",
       "docType": "user",
       "sourceRights": "Manufacturer-published on assets.avm.de",
-      "kinds": {}
+      "kinds": {
+        "26": "error-table",
+        "27": "error-table",
+        "28": "error-table",
+        "289": "troubleshooting",
+        "290": "troubleshooting",
+        "291": "troubleshooting",
+        "292": "troubleshooting",
+        "293": "troubleshooting"
+      }
     },
     {
       "id": "dji-mini2-user-manual",
       "file": "dji-mini2-user-manual.pdf",
-      "pages": "1-6",
+      "pages": "1-51",
       "category": "drone",
       "brand": "DJI",
       "model": "Mini 2",
       "docType": "user",
       "sourceRights": "Manufacturer-published on dl.djicdn.com",
-      "kinds": {}
+      "kinds": {
+        "13": "error-table",
+        "14": "error-table",
+        "16": "troubleshooting",
+        "17": "troubleshooting",
+        "25": "error-table"
+      }
     },
     {
       "id": "prusa-i3-mk3s-handbook",
       "file": "prusa-i3-mk3s-handbook.pdf",
-      "pages": "1-6",
+      "pages": "1-82",
       "category": "3d printer",
       "brand": "Prusa Research",
       "model": "Original Prusa i3 MK3S",
@@ -367,7 +437,7 @@
     {
       "id": "canon-eos-rebel-t7-manual",
       "file": "canon-eos-rebel-t7-manual.pdf",
-      "pages": "1-6,162-164",
+      "pages": "1-326",
       "category": "camera",
       "brand": "Canon",
       "model": "EOS Rebel T7 / EOS 1500D",
@@ -378,18 +448,22 @@
     {
       "id": "brother-xm2701-operation-manual",
       "file": "brother-xm2701-operation-manual.pdf",
-      "pages": "1-6",
+      "pages": "1-108",
       "category": "sewing machine",
       "brand": "Brother",
       "model": "XM2701 mechanical sewing machine",
       "docType": "user",
       "sourceRights": "Manufacturer-published on download.brother.com",
-      "kinds": {}
+      "kinds": {
+        "50": "troubleshooting",
+        "51": "troubleshooting",
+        "52": "troubleshooting"
+      }
     },
     {
       "id": "sram-1x-mtb-derailleur-manual",
       "file": "sram-1x-mtb-derailleur-manual.pdf",
-      "pages": "1-6",
+      "pages": "1-51",
       "category": "bicycle",
       "brand": "SRAM",
       "model": "1x MTB mechanical rear derailleurs (Eagle GX/X01/XX1, NX, SX)",
@@ -400,13 +474,24 @@
     {
       "id": "stihl-ms250-instruction-manual",
       "file": "stihl-ms250-instruction-manual.pdf",
-      "pages": "1-6",
+      "pages": "1-104",
       "category": "chainsaw",
       "brand": "Stihl",
       "model": "MS 250",
       "docType": "user",
       "sourceRights": "Manufacturer-published on ssc.stihl.com (Stihl techdoc server)",
-      "kinds": {}
+      "kinds": {
+        "28": "troubleshooting",
+        "30": "troubleshooting",
+        "31": "troubleshooting",
+        "32": "troubleshooting",
+        "33": "troubleshooting",
+        "34": "troubleshooting",
+        "35": "troubleshooting",
+        "36": "troubleshooting",
+        "41": "troubleshooting",
+        "42": "troubleshooting"
+      }
     }
   ]
 }
