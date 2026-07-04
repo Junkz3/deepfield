@@ -73,3 +73,33 @@ export function setWorkflowProfile(idOrProfile: string | WorkflowProfile): void 
 export function workflowProfile(): WorkflowProfile {
   return ACTIVE;
 }
+
+/** A workspace agent: one specialist the router can hand a request to.
+ *  The profile carries the vertical; the charter is the one line the
+ *  router matches requests against. */
+export interface AgentSpec {
+  id: string;
+  /** Display name ("Coverage advisor") */
+  label: string;
+  /** One line stating which requests belong to this agent */
+  charter: string;
+  profile: WorkflowProfile;
+  /** User toggle: disabled agents are invisible to the router */
+  active: boolean;
+}
+
+let TEAM: AgentSpec[] = [];
+
+export function setWorkflowTeam(team: AgentSpec[]): void {
+  TEAM = team;
+}
+
+export function workflowTeam(): AgentSpec[] {
+  return TEAM;
+}
+
+/** Agents the user left enabled for the next request. With one, the plan
+ *  prompt stays untouched; with several, plan() routes between them. */
+export function activeAgents(): AgentSpec[] {
+  return TEAM.filter((a) => a.active);
+}
