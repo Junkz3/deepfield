@@ -169,3 +169,16 @@
 }
 .sidebar-lang:hover { color: var(--text); }
 .sidebar-lang.active { color: var(--accent-strong); border-color: var(--accent); }
+
+.sidebar-langs { align-items: center; gap: var(--sp-2); }
+.sidebar-langs-label { font-size: var(--fs-xs); color: var(--text-faint); letter-spacing: 0.14em; }
+.sidebar-lang-select {
+  flex: 1;
+  background: var(--bg2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  padding: 4px 6px;
+}
+.sidebar-lang-select:focus { border-color: var(--accent); outline: none; }

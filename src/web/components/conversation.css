@@ -243,14 +243,19 @@
   animation: rc-fade-up var(--t-fast) both;
 }
 .cite-img-wrap.zoomed {
-  max-height: 92vh;
-  max-width: 92vw;
-  overflow: auto;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-2);
   background: #fff;
+  overflow: hidden;
 }
-.cite-img-wrap.zoomed img { width: auto; max-width: 92vw; }
+/* The whole page fits the viewport - no scrolling to read a citation */
+.cite-img-wrap.zoomed img {
+  display: block;
+  height: min(84vh, 1200px);
+  width: auto;
+  max-width: 88vw;
+  object-fit: contain;
+}
 
 /* ---- New conversation ---- */
 
@@ -623,4 +628,28 @@
   font-size: var(--fs-sm);
   line-height: 1.65;
   white-space: pre-wrap;
+}
+
+.lightbox-actions {
+  position: fixed;
+  top: var(--sp-4);
+  right: var(--sp-4);
+  z-index: 62;
+  display: flex;
+  gap: var(--sp-2);
+}
+.lightbox-translate { position: static; }
+
+/* Google-Lens style patch: translated text over the original block */
+.tl-patch {
+  position: absolute;
+  display: block;
+  background: rgba(252, 252, 250, 0.96);
+  color: #17202b;
+  padding: 2px 4px;
+  line-height: 1.25;
+  overflow: hidden;
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px rgba(252, 252, 250, 0.96);
+  font-family: var(--font-ui);
 }

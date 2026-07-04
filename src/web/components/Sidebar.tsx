@@ -1,4 +1,4 @@
-import { LANGS, LANG_NAMES, useApp } from '../store';
+import { LANGS, langName, useApp } from '../store';
 import { setAgentLanguage } from '../../vultr/client';
 import './sidebar.css';
 
@@ -67,19 +67,28 @@ export function Sidebar() {
       </div>
 
       <div className="sidebar-langs">
-        {LANGS.map((l) => (
-          <button
-            key={l.code}
-            className={`sidebar-lang mono ${state.lang === l.code ? 'active' : ''}`}
-            title={`Agent language: ${LANG_NAMES[l.code]} (retrieval is multilingual)`}
-            onClick={() => {
-              dispatch({ type: 'set-lang', lang: l.code });
-              setAgentLanguage(LANG_NAMES[l.code]);
-            }}
-          >
-            {l.label}
-          </button>
-        ))}
+        <span className="sidebar-langs-label mono">LANG</span>
+        <select
+          className="sidebar-lang-select mono"
+          value={state.lang}
+          title="Agent language. Retrieval is natively cross-lingual in the starred six; other languages route the search query through English."
+          onChange={(e) => {
+            const code = e.target.value;
+            dispatch({ type: 'set-lang', lang: code });
+            setAgentLanguage(langName(code));
+          }}
+        >
+          <optgroup label="Retrieval-grade">
+            {LANGS.filter((l) => l.retrieval).map((l) => (
+              <option key={l.code} value={l.code}>{l.code.toUpperCase()} — {l.name}</option>
+            ))}
+          </optgroup>
+          <optgroup label="Translation">
+            {LANGS.filter((l) => !l.retrieval).map((l) => (
+              <option key={l.code} value={l.code}>{l.code.toUpperCase()} — {l.name}</option>
+            ))}
+          </optgroup>
+        </select>
       </div>
       <div className="sidebar-foot">
         <span className="chip" title="Ctrl+Shift+D toggles the driver">

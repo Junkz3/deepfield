@@ -8,15 +8,26 @@ import { mergeDocs } from '../agent/taxonomy';
 
 export type DriverKind = 'fake' | 'vultr';
 
-/** The six languages VultronRetriever officially supports. */
-export type Lang = 'en' | 'fr' | 'de' | 'es' | 'it' | 'pt';
-export const LANGS: { code: Lang; label: string }[] = [
-  { code: 'en', label: 'EN' }, { code: 'fr', label: 'FR' }, { code: 'de', label: 'DE' },
-  { code: 'es', label: 'ES' }, { code: 'it', label: 'IT' }, { code: 'pt', label: 'PT' },
+export type Lang = string; // ISO-ish code; translation covers far more than retrieval
+
+/** Retrieval-grade languages (VultronRetriever official) first, then the long tail
+ *  Nemotron/Kimi translate to. */
+export const LANGS: { code: Lang; name: string; retrieval?: boolean }[] = [
+  { code: 'en', name: 'English', retrieval: true },
+  { code: 'fr', name: 'French', retrieval: true },
+  { code: 'de', name: 'German', retrieval: true },
+  { code: 'es', name: 'Spanish', retrieval: true },
+  { code: 'it', name: 'Italian', retrieval: true },
+  { code: 'pt', name: 'Portuguese', retrieval: true },
+  { code: 'nl', name: 'Dutch' }, { code: 'pl', name: 'Polish' }, { code: 'tr', name: 'Turkish' },
+  { code: 'ru', name: 'Russian' }, { code: 'uk', name: 'Ukrainian' }, { code: 'ar', name: 'Arabic' },
+  { code: 'hi', name: 'Hindi' }, { code: 'zh', name: 'Chinese' }, { code: 'ja', name: 'Japanese' },
+  { code: 'ko', name: 'Korean' }, { code: 'vi', name: 'Vietnamese' }, { code: 'th', name: 'Thai' },
+  { code: 'id', name: 'Indonesian' }, { code: 'sv', name: 'Swedish' }, { code: 'no', name: 'Norwegian' },
+  { code: 'da', name: 'Danish' }, { code: 'fi', name: 'Finnish' }, { code: 'cs', name: 'Czech' },
+  { code: 'ro', name: 'Romanian' }, { code: 'el', name: 'Greek' }, { code: 'he', name: 'Hebrew' },
 ];
-export const LANG_NAMES: Record<Lang, string> = {
-  en: 'English', fr: 'French', de: 'German', es: 'Spanish', it: 'Italian', pt: 'Portuguese',
-};
+export const langName = (code: Lang): string => LANGS.find((l) => l.code === code)?.name ?? 'English';
 
 export type ActiveView = { kind: 'center' } | { kind: 'conversation'; id: string };
 

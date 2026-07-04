@@ -3,22 +3,27 @@
 // video documents play in the official embedded player at the cited second.
 // The Translate action makes Nemotron read the page IMAGE and render it in
 // the technician's language - works on scans, tables and diagrams alike.
-import { useEffect, useState } from 'react';
-import { LANG_NAMES, useApp } from '../store';
+import { useEffect, useRef, useState } from 'react';
+import { langName, useApp } from '../store';
 import { translateLines, translatePage } from '../translate';
+import type { TextBlock } from '../../agent/types';
 
 export function PageLightbox() {
   const { state, dispatch, docs } = useApp();
   const lb = state.lightbox;
   const [translation, setTranslation] = useState<string | null>(null);
+  const [blocks, setBlocks] = useState<TextBlock[] | null>(null);
+  const [showTranslated, setShowTranslated] = useState(true);
   const [translating, setTranslating] = useState(false);
   const [chapterLines, setChapterLines] = useState<string[] | null>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [imgH, setImgH] = useState(600);
 
   const doc = lb ? docs.find((d) => d.id === lb.docId) : undefined;
   const idx = doc ? Math.max(0, doc.pages.findIndex((p) => p.page === lb!.page)) : 0;
 
-  // Reset the translation pane when the page changes.
-  useEffect(() => { setTranslation(null); setTranslating(false); }, [lb?.docId, lb?.page]);
+  // Reset the translation state when the page changes.
+  useEffect(() => { setTranslation(null); setBlocks(null); setTranslating(false); }, [lb?.docId, lb?.page]);
   useEffect(() => { setChapterLines(null); }, [lb?.docId]);
 
   useEffect(() => {
@@ -51,7 +56,24 @@ export function PageLightbox() {
       if (isVideo) {
         const lines = doc.pages.map((p) => p.text ?? '');
         setChapterLines(await translateLines(doc.id, lines, state.lang, state.driverKind));
+      } else if (
+        page.textBlocks &&
+        page.textBlocks.length > 0 &&
+        // degenerate layouts (dense TOCs, giant merged tables) read better in the pane
+        !page.textBlocks.some((b) => b.h > 0.35 || b.text.length >= 480)
+      ) {
+        // Pixel-true in-place translation: layout comes from the PDF text
+        // layer (extracted at ingest); only the words change language.
+        const translated = await translateLines(
+          `${doc.id}/${page.page}/blocks`,
+          page.textBlocks.map((b) => b.text),
+          state.lang,
+          state.driverKind,
+        );
+        setBlocks(page.textBlocks.map((b, i) => ({ ...b, text: translated[i] ?? b.text })));
+        setShowTranslated(true);
       } else {
+        // Scans have no text layer: honest side-pane fallback via Nemotron read.
         setTranslation(await translatePage(doc.id, page.page, page.imageUrl, state.lang, state.driverKind));
       }
     } catch (e) {
@@ -67,13 +89,20 @@ export function PageLightbox() {
         {doc.brand} {doc.model} — {isVideo ? `segment @ ${mmss(page.timestamp!)}: "${page.text}"` : `p.${page.page} (${page.kind})`} · {doc.sourceRights}
       </div>
 
-      <button
-        className={`btn lightbox-translate ${translating ? 'busy' : ''}`}
-        onClick={(e) => { e.stopPropagation(); void runTranslate(); }}
-        title={`Translate to ${LANG_NAMES[state.lang]} (language selector in the sidebar)`}
-      >
-        {translating ? 'Reading the page…' : `Translate to ${state.lang.toUpperCase()}`}
-      </button>
+      <div className="lightbox-actions" onClick={(e) => e.stopPropagation()}>
+        {blocks && (
+          <button className="btn" onClick={() => setShowTranslated(!showTranslated)}>
+            {showTranslated ? 'Show original' : `Show ${state.lang.toUpperCase()}`}
+          </button>
+        )}
+        <button
+          className={`btn lightbox-translate ${translating ? 'busy' : ''}`}
+          onClick={() => void runTranslate()}
+          title={`Translate to ${langName(state.lang)} (language selector in the sidebar)`}
+        >
+          {translating ? 'Reading the page…' : `Translate to ${state.lang.toUpperCase()}`}
+        </button>
+      </div>
 
       <div className="lightbox-stage" onClick={(e) => e.stopPropagation()}>
         {isVideo ? (
@@ -88,7 +117,27 @@ export function PageLightbox() {
           </div>
         ) : (
           <span className="cite-img-wrap zoomed">
-            <img src={page.imageUrl} alt={`${doc.model} page ${page.page}`} />
+            <img
+              ref={imgRef}
+              src={page.imageUrl}
+              alt={`${doc.model} page ${page.page}`}
+              onLoad={() => imgRef.current && setImgH(imgRef.current.clientHeight)}
+            />
+            {blocks && showTranslated && blocks.map((b, i) => (
+              <span
+                key={i}
+                className="tl-patch"
+                style={{
+                  left: `${b.x * 100}%`,
+                  top: `${b.y * 100}%`,
+                  width: `${b.w * 100}%`,
+                  minHeight: `${b.h * 100}%`,
+                  fontSize: `${Math.max(8, Math.min(20, Math.round(b.h * imgH * 0.34)))}px`,
+                }}
+              >
+                {b.text}
+              </span>
+            ))}
             {page.region && (
               <span
                 className="cite-region strong"
@@ -106,7 +155,7 @@ export function PageLightbox() {
         {translation && !isVideo && (
           <aside className="translate-pane fade-up">
             <div className="translate-head mono">
-              {LANG_NAMES[state.lang].toUpperCase()} · NEMOTRON READ
+              {langName(state.lang).toUpperCase()} · NEMOTRON READ
               <button onClick={() => setTranslation(null)} title="Close translation">×</button>
             </div>
             <div className="translate-body">{translation}</div>

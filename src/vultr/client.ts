@@ -63,7 +63,7 @@ export class VultrDriver implements ModelDriver {
 
   async plan(q: { device: string; symptom: string; hasPhoto: boolean; userInput?: string }): Promise<PlanAction> {
     const text = await chatText(this.t, MODELS.kimi,
-      `You are a repair agent planning evidence retrieval from service manuals.\nDevice: ${q.device}\nSymptom: ${q.symptom}\nUser input: ${q.userInput ?? 'none'}\nReturn STRICT JSON: {"goal": string, "queries": [string]} - one focused retrieval query (error code table / troubleshooting first).`, 600);
+      `You are a repair agent planning evidence retrieval from service manuals.\nDevice: ${q.device}\nSymptom: ${q.symptom}\nUser input: ${q.userInput ?? 'none'}\nReturn STRICT JSON: {"goal": string, "queries": [string]} - one focused retrieval query (error code table / troubleshooting first). The retrieval query MUST be written in English (the corpus language) regardless of the user's language; write the goal in ${AGENT_LANG}.`, 600);
     return extractJson<PlanAction>(text, { goal: `Diagnose ${q.symptom}`, queries: [`${q.device} ${q.symptom}`] });
   }
 

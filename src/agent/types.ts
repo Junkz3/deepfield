@@ -5,7 +5,8 @@ export type DocFormat = 'pdf' | 'image' | 'text' | 'video';
 export type DocType = 'service' | 'user' | 'schematic' | 'parts' | 'video';
 export type Origin = 'corpus' | 'session';
 export interface Region { x: number; y: number; w: number; h: number } // normalized [0,1]
-export interface Page { docId: string; page: number; imageUrl: string; text?: string; title?: string; kind: PageKind; region?: Region; timestamp?: number; videoUrl?: string }
+export interface TextBlock extends Region { text: string } // exact layout block from the PDF text layer
+export interface Page { docId: string; page: number; imageUrl: string; text?: string; title?: string; kind: PageKind; region?: Region; timestamp?: number; videoUrl?: string; textBlocks?: TextBlock[] }
 export interface Document { id: string; filename: string; format: DocFormat; category: string; brand: string; model: string; docType: DocType; pages: Page[]; sourceRights: string; origin: Origin }
 export interface Citation { docId: string; page: number; region?: Region; quote?: string; timestamp?: number; label: string; title?: string }
 export interface ScoredPage { page: Page; score: number }

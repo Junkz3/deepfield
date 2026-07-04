@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildTaxonomy } from '../src/agent/taxonomy';
-import type { Document, Page, PageKind, Region } from '../src/agent/types';
+import type { Document, Page, PageKind, Region, TextBlock } from '../src/agent/types';
 
 interface ManifestDoc { id: string; file: string; pages: string; category: string; brand: string; model: string; docType: Document['docType']; sourceRights: string; kinds: Record<string, PageKind>; regions?: Record<string, Region> }
 interface ManifestVideo { id: string; videoId: string; url: string; title: string; category: string; brand: string; model: string; sourceRights: string; chaptersFile: string }
@@ -16,6 +16,60 @@ const SRC = join(ROOT, 'corpus/src');
 const OUT = join(ROOT, 'public/corpus');
 const manifest = JSON.parse(readFileSync(join(ROOT, 'corpus/manifest.json'), 'utf8')) as { docs: ManifestDoc[]; videos?: ManifestVideo[] };
 const only = process.argv[2];
+
+/** Pixel-true text layout from the PDF text layer: words -> lines -> blocks.
+ *  Powers in-place translation without any vision call for positioning. */
+function extractTextBlocks(pdf: string, pageNum: number): TextBlock[] {
+  let xml = '';
+  try {
+    xml = execFileSync('pdftotext', ['-bbox', '-f', String(pageNum), '-l', String(pageNum), pdf, '-'], { encoding: 'utf8' });
+  } catch { return []; }
+  const pageM = /<page width="([\d.]+)" height="([\d.]+)">/.exec(xml);
+  if (!pageM) return [];
+  const W = Number(pageM[1]), H = Number(pageM[2]);
+  const words: { x1: number; y1: number; x2: number; y2: number; t: string }[] = [];
+  const re = /<word xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([^<]*)<\/word>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(xml))) {
+    words.push({ x1: Number(m[1]), y1: Number(m[2]), x2: Number(m[3]), y2: Number(m[4]), t: m[5] });
+  }
+  if (words.length === 0) return [];
+  // words -> lines (shared baseline within half a line height)
+  words.sort((a, b) => a.y1 - b.y1 || a.x1 - b.x1);
+  const lines: { x1: number; y1: number; x2: number; y2: number; t: string }[] = [];
+  for (const w of words) {
+    const last = lines[lines.length - 1];
+    const h = w.y2 - w.y1;
+    if (last && Math.abs(w.y1 - last.y1) < h * 0.6) {
+      last.x2 = Math.max(last.x2, w.x2); last.y2 = Math.max(last.y2, w.y2);
+      last.x1 = Math.min(last.x1, w.x1); last.t += ` ${w.t}`;
+    } else {
+      lines.push({ ...w });
+    }
+  }
+  // lines -> blocks (vertical gap below 0.9 line height merges)
+  const blocks: { x1: number; y1: number; x2: number; y2: number; t: string }[] = [];
+  for (const l of lines) {
+    const last = blocks[blocks.length - 1];
+    const lh = l.y2 - l.y1;
+    if (last && l.y1 - last.y2 < lh * 0.9 && l.x1 < last.x2 + 20 && l.x2 > last.x1 - 20) {
+      last.x1 = Math.min(last.x1, l.x1); last.x2 = Math.max(last.x2, l.x2);
+      last.y2 = Math.max(last.y2, l.y2); last.t += `\n${l.t}`;
+    } else {
+      blocks.push({ ...l });
+    }
+  }
+  return blocks
+    .filter((b) => b.t.trim().length > 1)
+    .slice(0, 24)
+    .map((b) => ({
+      x: +(b.x1 / W).toFixed(4),
+      y: +(b.y1 / H).toFixed(4),
+      w: +((b.x2 - b.x1) / W).toFixed(4),
+      h: +((b.y2 - b.y1) / H).toFixed(4),
+      text: b.t.replace(/\s+/g, ' ').trim().slice(0, 500),
+    }));
+}
 
 function parseRanges(spec: string, pageCount: number): number[] {
   if (spec === 'all') return Array.from({ length: pageCount }, (_, i) => i + 1);
@@ -45,11 +99,13 @@ for (const m of manifest.docs) {
     }
     let text = '';
     try { text = execFileSync('pdftotext', ['-f', String(p), '-l', String(p), pdf, '-'], { encoding: 'utf8' }).trim(); } catch {}
+    const textBlocks = extractTextBlocks(pdf, p);
     docPages.push({
       docId: m.id, page: p, imageUrl: `/corpus/${m.id}/p${p}.png`,
       text: text.slice(0, 600) || undefined,
       kind: m.kinds[String(p)] ?? 'other',
       region: m.regions?.[String(p)],
+      textBlocks: textBlocks.length > 0 ? textBlocks : undefined,
     });
     process.stdout.write(`\r${m.id}: p${p}/${pages[pages.length - 1]}   `);
   }
