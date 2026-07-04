@@ -30,13 +30,20 @@ export function mergeDocs(corpus: Document[], session: Document[]): Document[] {
   return [...byId.values()];
 }
 
-export function candidatePages(docs: Document[], deviceQuery: string): Page[] {
+/** Which documents a device query scopes to — the single source of truth the
+ *  agent loop AND the universe rendering share (contextual recursion). */
+export function scopeDocIds(docs: Document[], deviceQuery: string): Set<string> {
   const tokens = deviceQuery.toLowerCase().split(/\s+/).filter(Boolean);
   const matches = docs.filter((d) =>
     tokens.some((t) => [d.category, d.brand, d.model].some((f) => f.toLowerCase().includes(t))),
   );
   const scope = matches.length > 0 ? matches : docs;
-  return scope.flatMap((d) => d.pages);
+  return new Set(scope.map((d) => d.id));
+}
+
+export function candidatePages(docs: Document[], deviceQuery: string): Page[] {
+  const ids = scopeDocIds(docs, deviceQuery);
+  return docs.filter((d) => ids.has(d.id)).flatMap((d) => d.pages);
 }
 
 export function layoutGalaxy(root: TaxonomyNode): GalaxyLayout {

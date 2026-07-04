@@ -138,3 +138,15 @@
   display: flex;
   justify-content: flex-start;
 }
+
+.sidebar-foot { justify-content: space-between; align-items: center; }
+.sidebar-reset {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+.sidebar-reset:hover { color: var(--err); border-color: var(--err); }

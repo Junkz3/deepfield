@@ -73,6 +73,13 @@ export function Sidebar() {
           />
           {state.driverKind === 'vultr' ? 'VULTR LIVE' : 'OFFLINE SCRIPT'}
         </span>
+        <button
+          className="sidebar-reset mono"
+          title="Clear conversations and session files, back to the seeded corpus"
+          onClick={() => dispatch({ type: 'demo-reset' })}
+        >
+          RESET
+        </button>
       </div>
     </aside>
   );

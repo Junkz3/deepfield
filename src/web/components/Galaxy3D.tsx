@@ -186,33 +186,40 @@ interface FileNode {
   sparks: [number, number, number][];
 }
 
-function FileCard({ node, isHit, hitCount, onHover, onSelect }: {
+function FileCard({ node, targetPos, ghost, isHit, hitCount, onHover, onSelect }: {
   node: FileNode;
+  targetPos: THREE.Vector3;
+  ghost: boolean;
   isHit: boolean;
   hitCount: number;
   onHover: (h: { doc: Document; x: number; y: number } | null) => void;
   onSelect: (docId: string) => void;
 }) {
   const mat = useRef<THREE.MeshBasicMaterial>(null);
+  const root = useRef<THREE.Group>(null);
   const seed = node.doc.id.length + node.catIndex * 7;
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, dt) => {
+    // Contextual recursion: the universe recomposes — scoped files migrate
+    // toward the core, everything else fades to a distant ghost.
+    if (root.current) root.current.position.lerp(targetPos, Math.min(dt * 2.6, 1));
     if (!mat.current) return;
     const t = clock.elapsedTime;
-    const base = isHit ? 1 : 0.68;
-    mat.current.opacity = base + Math.sin(t * (1.6 + (seed % 3) * 0.5) + seed) * 0.1;
+    const base = ghost ? 0.06 : isHit ? 1 : 0.68;
+    const flicker = ghost ? 0 : Math.sin(t * (1.6 + (seed % 3) * 0.5) + seed) * 0.1;
+    mat.current.opacity = base + flicker;
   });
 
   const texture = fileCardTexture(node.color);
   const scale: [number, number] = isHit ? [0.42, 0.525] : [0.3, 0.375];
 
   return (
-    <group position={node.pos}>
+    <group ref={root} position={node.pos}>
       <Billboard>
         <mesh
-          onPointerOver={(e) => { e.stopPropagation(); onHover({ doc: node.doc, x: e.clientX ?? 0, y: e.clientY ?? 0 }); document.body.style.cursor = 'pointer'; }}
-          onPointerOut={() => { onHover(null); document.body.style.cursor = ''; }}
-          onClick={(e) => { e.stopPropagation(); onSelect(node.doc.id); }}
+          onPointerOver={(e) => { if (ghost) return; e.stopPropagation(); onHover({ doc: node.doc, x: e.clientX ?? 0, y: e.clientY ?? 0 }); document.body.style.cursor = 'pointer'; }}
+          onPointerOut={() => { if (ghost) return; onHover(null); document.body.style.cursor = ''; }}
+          onClick={(e) => { if (ghost) return; e.stopPropagation(); onSelect(node.doc.id); }}
         >
           <planeGeometry args={scale} />
           <meshBasicMaterial
@@ -231,16 +238,18 @@ function FileCard({ node, isHit, hitCount, onHover, onSelect }: {
             <meshBasicMaterial color="#ffb454" transparent opacity={0.85} depthWrite={false} />
           </mesh>
         )}
-        <Text
-          position={[0, -0.31, 0]}
-          fontSize={0.095}
-          color={isHit ? '#ffffff' : '#93a3b3'}
-          anchorX="center"
-          outlineWidth={0.005}
-          outlineColor="#080b10"
-        >
-          {node.doc.model}
-        </Text>
+        {!ghost && (
+          <Text
+            position={[0, -0.31, 0]}
+            fontSize={0.095}
+            color={isHit ? '#ffffff' : '#93a3b3'}
+            anchorX="center"
+            outlineWidth={0.005}
+            outlineColor="#080b10"
+          >
+            {node.doc.model}
+          </Text>
+        )}
         {isHit && hitCount > 0 && (
           <Text position={[0, 0.35, 0]} fontSize={0.085} color="#ffc678" anchorX="center" outlineWidth={0.005} outlineColor="#080b10">
             {`${hitCount} page${hitCount > 1 ? 's' : ''} cited`}
@@ -256,7 +265,7 @@ function FileCard({ node, isHit, hitCount, onHover, onSelect }: {
           color={isHit ? '#ffffff' : node.color}
           size={isHit ? 0.04 : 0.024}
           transparent
-          opacity={isHit ? 0.9 : 0.42}
+          opacity={ghost ? 0.05 : isHit ? 0.9 : 0.42}
           depthWrite={false}
           blending={THREE.AdditiveBlending}
           sizeAttenuation
@@ -359,13 +368,19 @@ function CameraRig({ focus, panelOpen }: { focus: THREE.Vector3 | null; panelOpe
 
 /* ---------- scene ---------- */
 
-function Scene({ panelOpen, onHover, onSelect, onOpenPage }: {
+function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
   panelOpen: boolean;
+  scopeIds: Set<string> | null;
   onHover: (h: { doc: Document; x: number; y: number } | null) => void;
   onSelect: (docId: string) => void;
   onOpenPage: (docId: string, page: number) => void;
 }) {
   const { state, docs } = useApp();
+  const scopeActive = panelOpen && scopeIds !== null && scopeIds.size < docs.length;
+  const inScope = (docId: string) => !scopeActive || (scopeIds?.has(docId) ?? true);
+  // Where a doc LIVES right now: scoped files migrate into a tight working
+  // system around the core; ghosts stay out on the full shell.
+  const livePos = (n: FileNode) => (scopeActive && inScope(n.doc.id) ? n.pos.clone().multiplyScalar(0.5) : n.pos);
 
   const { nodes, catAnchors } = useMemo(() => {
     const categories = [...new Set(docs.map((d) => d.category))].sort();
@@ -431,19 +446,22 @@ function Scene({ panelOpen, onHover, onSelect, onOpenPage }: {
       <OrbitRings />
       <AgentCore scanning={state.scanning} />
 
-      {catAnchors.map((c) => (
-        <Billboard key={c.label} position={c.dir.clone().multiplyScalar(R + 0.72).toArray()}>
-          <Text fontSize={0.082} color={c.color} anchorX="center" letterSpacing={0.22} outlineWidth={0.005} outlineColor="#080b10" fillOpacity={0.8}>
-            {c.label.toUpperCase()}
-          </Text>
-        </Billboard>
-      ))}
+      {catAnchors.map((c) => {
+        const catInScope = nodes.some((n) => n.doc.category === c.label && inScope(n.doc.id));
+        return (
+          <Billboard key={c.label} position={c.dir.clone().multiplyScalar(R + 0.72).toArray()}>
+            <Text fontSize={0.082} color={c.color} anchorX="center" letterSpacing={0.22} outlineWidth={0.005} outlineColor="#080b10" fillOpacity={catInScope ? 0.8 : 0.1}>
+              {c.label.toUpperCase()}
+            </Text>
+          </Billboard>
+        );
+      })}
 
       {nodes.map((n) => (
         <group key={n.doc.id}>
           {hitByDoc.has(n.doc.id) && (
             <Line
-              points={[[0, 0, 0], n.pos.toArray()]}
+              points={[[0, 0, 0], livePos(n).toArray()]}
               color={n.color}
               lineWidth={2.5}
               dashed
@@ -454,6 +472,8 @@ function Scene({ panelOpen, onHover, onSelect, onOpenPage }: {
           )}
           <FileCard
             node={n}
+            targetPos={livePos(n)}
+            ghost={!inScope(n.doc.id)}
             isHit={hitByDoc.has(n.doc.id)}
             hitCount={(hitByDoc.get(n.doc.id) ?? []).length}
             onHover={onHover}
@@ -468,19 +488,20 @@ function Scene({ panelOpen, onHover, onSelect, onOpenPage }: {
           url={p.url}
           index={i}
           total={floatingPages.length}
-          anchor={focusNode.pos}
+          anchor={livePos(focusNode)}
           color={focusNode.color}
           onClick={() => onOpenPage(focusNode.doc.id, p.page)}
         />
       ))}
 
-      <CameraRig focus={focusNode?.pos ?? null} panelOpen={panelOpen} />
+      <CameraRig focus={focusNode ? livePos(focusNode) : null} panelOpen={panelOpen} />
     </>
   );
 }
 
-export function Galaxy3D({ panelOpen = false, onSelectDoc, onOpenPage }: {
+export function Galaxy3D({ panelOpen = false, scopeIds = null, onSelectDoc, onOpenPage }: {
   panelOpen?: boolean;
+  scopeIds?: Set<string> | null;
   onSelectDoc?: (docId: string) => void;
   onOpenPage?: (docId: string, page: number) => void;
 }) {
@@ -490,6 +511,7 @@ export function Galaxy3D({ panelOpen = false, onSelectDoc, onOpenPage }: {
       <Canvas camera={{ position: [0, 2.0, 7.4], fov: 42 }} dpr={[1, 2]}>
         <Scene
           panelOpen={panelOpen}
+          scopeIds={scopeIds}
           onHover={setHover}
           onSelect={(id) => onSelectDoc?.(id)}
           onOpenPage={(d, p) => onOpenPage?.(d, p)}

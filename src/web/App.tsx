@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { scopeDocIds } from '../agent/taxonomy';
 import { AppProvider, useApp } from './store';
 import { Sidebar } from './components/Sidebar';
 import { ConversationView } from './components/ConversationView';
@@ -11,9 +12,16 @@ import './components/galaxy.css';
 const Galaxy3D = lazy(() => import('./components/Galaxy3D').then((m) => ({ default: m.Galaxy3D })));
 
 function Shell() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, docs } = useApp();
   const [showTree, setShowTree] = useState(false);
   const inConversation = state.activeView.kind === 'conversation';
+
+  // Contextual recursion: the active conversation's scope recomposes the universe.
+  const scopeIds = useMemo(() => {
+    if (state.activeView.kind !== 'conversation') return null;
+    const conv = state.conversations.find((c) => state.activeView.kind === 'conversation' && c.id === state.activeView.id);
+    return conv ? scopeDocIds(docs, conv.device) : null;
+  }, [state.activeView, state.conversations, docs]);
 
   // Global shortcuts: Ctrl+Shift+R = demo reset, Ctrl+Shift+D = driver toggle.
   useEffect(() => {
@@ -39,6 +47,7 @@ function Shell() {
         <Suspense fallback={<div className="galaxy-loading mono">Charting the knowledge universe…</div>}>
           <Galaxy3D
             panelOpen={inConversation}
+            scopeIds={scopeIds}
             onOpenPage={(docId, page) => dispatch({ type: 'open-lightbox', docId, page })}
           />
         </Suspense>

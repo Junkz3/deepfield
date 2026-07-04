@@ -60,3 +60,12 @@ describe('layoutGalaxy', () => {
     expect(a.edges.some((e) => e.from.startsWith('cat:'))).toBe(true);
   });
 });
+
+describe('scopeDocIds (contextual recursion)', () => {
+  it('scopes to matching docs and shares truth with candidatePages', async () => {
+    const { scopeDocIds } = await import('./taxonomy');
+    const ids = scopeDocIds(CORPUS, 'Whirlpool dishwasher');
+    expect(ids).toEqual(new Set(['whirlpool-dw', 'lg-dw']));
+    expect(scopeDocIds(CORPUS, 'zzz unknown').size).toBe(3);
+  });
+});
