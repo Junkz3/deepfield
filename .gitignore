@@ -6,5 +6,7 @@ dist/
 .dev.vars
 .wrangler/
 corpus/src/
+corpus-insurance/src/
 *.log
+public/corpus-insurance/
 public/corpus/

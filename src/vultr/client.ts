@@ -212,11 +212,22 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
   }
 
   async classify(input: ClassifyInput): Promise<DocMeta> {
-    const parts: unknown[] = [{ type: 'text', text: `Classify this document (filename: ${input.filename}). First pages attached. ${workflowProfile().classifyHint}. Return STRICT JSON: {"category": string (lowercase), "brand": string, "model": string, "docType": "service"|"user"|"schematic"|"parts", "pageKinds": []} Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.` }];
-    for (const img of input.pageImages.slice(0, 3)) parts.push({ type: 'image_url', image_url: { url: img } });
-    const text = await chatText(this.t, MODELS.omni, parts, 6000);
-    const meta = extractJson<DocMeta>(text, { category: 'uncategorized', brand: 'Unknown', model: 'Unknown', docType: 'user', pageKinds: [] });
-    meta.pageKinds = input.pageImages.map(() => 'other');
-    return meta;
+    const basePrompt = `Classify this document (filename: ${input.filename}). First pages attached. ${workflowProfile().classifyHint}. Return STRICT JSON: {"category": string (lowercase), "brand": string, "model": string, "docType": "service"|"user"|"schematic"|"parts", "pageKinds": []} Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.`;
+    const images = input.pageImages.slice(0, 3).map((img) => ({ type: 'image_url', image_url: { url: img } }));
+    const fallback: DocMeta = { category: 'uncategorized', brand: 'Unknown', model: 'Unknown', docType: 'user', pageKinds: [] };
+    // Same two-regime retry as diagnose: dense legal cover pages make the
+    // model ruminate past the token cap (measured: 4 of 6 policy wordings).
+    for (const [i, take] of [3, 3, 1].entries()) {
+      const head = i === 0 ? basePrompt
+        : `YOUR PREVIOUS ATTEMPT WAS CUT BY THE TOKEN CAP BEFORE ANY OUTPUT. Do NOT deliberate: at most 20 words of internal reasoning, then the JSON object immediately.\n${basePrompt}`;
+      const text = await chatText(this.t, MODELS.omni, [{ type: 'text', text: head }, ...images.slice(0, take)], 8000);
+      const meta = extractJson<DocMeta>(text, fallback);
+      if (meta !== fallback) {
+        meta.pageKinds = input.pageImages.map(() => 'other');
+        return meta;
+      }
+    }
+    fallback.pageKinds = input.pageImages.map(() => 'other');
+    return fallback;
   }
 }

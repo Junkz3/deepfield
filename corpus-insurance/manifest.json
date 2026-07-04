@@ -1,0 +1,70 @@
+{
+  "docs": [
+    {
+      "id": "saga-car-policy",
+      "file": "saga-car-policy.pdf",
+      "pages": "1-88",
+      "category": "unclassified",
+      "brand": "Unclassified",
+      "model": "Unclassified",
+      "docType": "user",
+      "sourceRights": "Saga public car insurance policy wording (publicly published policy document)",
+      "kinds": {}
+    },
+    {
+      "id": "morethan-car-policy",
+      "file": "morethan-car-policy.pdf",
+      "pages": "1-36",
+      "category": "unclassified",
+      "brand": "Unclassified",
+      "model": "Unclassified",
+      "docType": "user",
+      "sourceRights": "MORE THAN (RSA) public car insurance policy wording",
+      "kinds": {}
+    },
+    {
+      "id": "policyexpert-home-policy",
+      "file": "policyexpert-home-policy.pdf",
+      "pages": "1-44",
+      "category": "unclassified",
+      "brand": "Unclassified",
+      "model": "Unclassified",
+      "docType": "user",
+      "sourceRights": "Policy Expert public home insurance policy wording",
+      "kinds": {}
+    },
+    {
+      "id": "hiscox-home-policy",
+      "file": "hiscox-home-policy.pdf",
+      "pages": "1-20",
+      "category": "unclassified",
+      "brand": "Unclassified",
+      "model": "Unclassified",
+      "docType": "user",
+      "sourceRights": "Hiscox public home insurance policy wording",
+      "kinds": {}
+    },
+    {
+      "id": "allianz-travel-basic",
+      "file": "allianz-travel-basic.pdf",
+      "pages": "1-30",
+      "category": "unclassified",
+      "brand": "Unclassified",
+      "model": "Unclassified",
+      "docType": "user",
+      "sourceRights": "Allianz public travel insurance policy brochure",
+      "kinds": {}
+    },
+    {
+      "id": "applecare-plus-tl",
+      "file": "applecare-plus-tl.pdf",
+      "pages": "1-4",
+      "category": "unclassified",
+      "brand": "Unclassified",
+      "model": "Unclassified",
+      "docType": "user",
+      "sourceRights": "Apple public AppleCare+ with Theft and Loss program summary and disclosures",
+      "kinds": {}
+    }
+  ]
+}

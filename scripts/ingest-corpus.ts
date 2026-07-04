@@ -15,9 +15,12 @@ interface ManifestDoc { id: string; file: string; pages: string; category: strin
 interface ManifestVideo { id: string; videoId: string; url: string; title: string; category: string; brand: string; model: string; sourceRights: string; chaptersFile: string }
 
 const ROOT = new URL('..', import.meta.url).pathname;
-const SRC = join(ROOT, 'corpus/src');
-const OUT = join(ROOT, 'public/corpus');
-const manifest = JSON.parse(readFileSync(join(ROOT, 'corpus/manifest.json'), 'utf8')) as { docs: ManifestDoc[]; videos?: ManifestVideo[] };
+// CORPUS_DIR switches the whole pipeline to another vertical's corpus
+// (e.g. CORPUS_DIR=corpus-insurance -> public/corpus-insurance).
+const CORPUS_DIR = process.env.CORPUS_DIR ?? 'corpus';
+const SRC = join(ROOT, CORPUS_DIR, 'src');
+const OUT = join(ROOT, 'public', CORPUS_DIR);
+const manifest = JSON.parse(readFileSync(join(ROOT, CORPUS_DIR, 'manifest.json'), 'utf8')) as { docs: ManifestDoc[]; videos?: ManifestVideo[] };
 const only = process.argv[2];
 
 /** Pixel-true text layout from the PDF text layer: words -> lines -> blocks.
@@ -114,7 +117,7 @@ for (const m of manifest.docs) {
       try { text = (await execFile('pdftotext', ['-f', String(p), '-l', String(p), pdf, '-'], { encoding: 'utf8' })).stdout.trim(); } catch {}
       const textBlocks = await extractTextBlocks(pdf, p);
       docPages[i] = {
-        docId: m.id, page: p, imageUrl: `/corpus/${m.id}/p${p}.png`,
+        docId: m.id, page: p, imageUrl: `/${CORPUS_DIR}/${m.id}/p${p}.png`,
         text: text.slice(0, 600) || undefined,
         kind: m.kinds[String(p)] ?? 'other',
         region: m.regions?.[String(p)],
@@ -133,7 +136,7 @@ for (const m of manifest.docs) {
 for (const v of manifest.videos ?? []) {
   if (only && v.id !== only) continue;
   const chapters = JSON.parse(readFileSync(join(ROOT, 'corpus', v.chaptersFile), 'utf8')) as { timestamp: number; title: string }[];
-  const thumb = `/corpus/${v.id}/thumb.jpg`;
+  const thumb = `/${CORPUS_DIR}/${v.id}/thumb.jpg`;
   if (!existsSync(join(ROOT, 'public', thumb.slice(1)))) console.warn(`WARN ${v.id}: missing ${thumb}`);
   docs.push({
     id: v.id,
@@ -146,7 +149,7 @@ for (const v of manifest.videos ?? []) {
     sourceRights: v.sourceRights,
     origin: 'corpus',
     pages: chapters.map((c, i) => {
-      const frame = `/corpus/${v.id}/seg${i + 1}.jpg`;
+      const frame = `/${CORPUS_DIR}/${v.id}/seg${i + 1}.jpg`;
       const hasFrame = existsSync(join(ROOT, 'public', frame.slice(1)));
       return {
         docId: v.id,
