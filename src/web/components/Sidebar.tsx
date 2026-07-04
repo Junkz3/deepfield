@@ -1,4 +1,5 @@
-import { useApp } from '../store';
+import { LANGS, LANG_NAMES, useApp } from '../store';
+import { setAgentLanguage } from '../../vultr/client';
 import './sidebar.css';
 
 /** Galaxy glyph: the agent sun + two orbiting docs, pure SVG, no emoji. */
@@ -65,6 +66,21 @@ export function Sidebar() {
         </div>
       </div>
 
+      <div className="sidebar-langs">
+        {LANGS.map((l) => (
+          <button
+            key={l.code}
+            className={`sidebar-lang mono ${state.lang === l.code ? 'active' : ''}`}
+            title={`Agent language: ${LANG_NAMES[l.code]} (retrieval is multilingual)`}
+            onClick={() => {
+              dispatch({ type: 'set-lang', lang: l.code });
+              setAgentLanguage(LANG_NAMES[l.code]);
+            }}
+          >
+            {l.label}
+          </button>
+        ))}
+      </div>
       <div className="sidebar-foot">
         <span className="chip" title="Ctrl+Shift+D toggles the driver">
           <span

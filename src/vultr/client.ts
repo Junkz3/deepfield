@@ -27,6 +27,10 @@ export function proxyTransport(demoToken?: string): Transport {
   };
 }
 
+/** Language the agent answers in (set from the UI language selector). */
+let AGENT_LANG = 'English';
+export function setAgentLanguage(name: string) { AGENT_LANG = name; }
+
 export const MODELS = {
   rerank: 'vultr/VultronRetrieverPrime-Qwen3.5-8B',
   omni: 'nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16',
@@ -101,7 +105,7 @@ export class VultrDriver implements ModelDriver {
   }
 
   async diagnose(q: { device: string; symptom: string }, evidence: Page[], techPhoto?: string): Promise<Diagnosis> {
-    const parts: unknown[] = [{ type: 'text', text: `You are a repair diagnosis agent. Device: ${q.device}. Symptom: ${q.symptom}.\nGround yourself ONLY in the attached manual pages${techPhoto ? ' and the technician photo (last image)' : ''}. Return STRICT JSON: {"component": string, "cause": string, "checks": [string, string, string]} - checks ordered, concrete, with measurable values when the pages give them. If the pages do not support a diagnosis, set component to "insufficient evidence". Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.` }];
+    const parts: unknown[] = [{ type: 'text', text: `You are a repair diagnosis agent. Device: ${q.device}. Symptom: ${q.symptom}.\nGround yourself ONLY in the attached manual pages${techPhoto ? ' and the technician photo (last image)' : ''}. Return STRICT JSON: {"component": string, "cause": string, "checks": [string, string, string]} - checks ordered, concrete, with measurable values when the pages give them. Write component/cause/checks in ${AGENT_LANG}; keep part numbers and error codes verbatim. If the pages do not support a diagnosis, set component to "insufficient evidence". Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.` }];
     for (const p of evidence.slice(0, 4)) parts.push({ type: 'image_url', image_url: { url: await toDataUrl(p.imageUrl) } });
     if (techPhoto) parts.push({ type: 'image_url', image_url: { url: techPhoto } });
     const text = await chatText(this.t, MODELS.omni, parts, 2000);

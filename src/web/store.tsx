@@ -8,6 +8,16 @@ import { mergeDocs } from '../agent/taxonomy';
 
 export type DriverKind = 'fake' | 'vultr';
 
+/** The six languages VultronRetriever officially supports. */
+export type Lang = 'en' | 'fr' | 'de' | 'es' | 'it' | 'pt';
+export const LANGS: { code: Lang; label: string }[] = [
+  { code: 'en', label: 'EN' }, { code: 'fr', label: 'FR' }, { code: 'de', label: 'DE' },
+  { code: 'es', label: 'ES' }, { code: 'it', label: 'IT' }, { code: 'pt', label: 'PT' },
+];
+export const LANG_NAMES: Record<Lang, string> = {
+  en: 'English', fr: 'French', de: 'German', es: 'Spanish', it: 'Italian', pt: 'Portuguese',
+};
+
 export type ActiveView = { kind: 'center' } | { kind: 'conversation'; id: string };
 
 export interface AppState {
@@ -24,6 +34,8 @@ export interface AppState {
   ingesting: { name: string } | null;
   /** the doc that was just classified: its card flies from the core */
   lastBorn: string | null;
+  /** technician language: retrieval is multilingual, the agent answers in it */
+  lang: Lang;
 }
 
 export type Action =
@@ -40,6 +52,7 @@ export type Action =
   | { type: 'close-lightbox' }
   | { type: 'ingest-start'; name: string }
   | { type: 'ingest-done'; docId: string | null }
+  | { type: 'set-lang'; lang: Lang }
   | { type: 'demo-reset' };
 
 const LS_KEY = 'rc.conversations';
@@ -70,6 +83,7 @@ export const initialState: AppState = {
   lightbox: null,
   ingesting: null,
   lastBorn: null,
+  lang: (localStorage.getItem('rc.lang') as Lang) || 'en',
 };
 
 export function reducer(state: AppState, a: Action): AppState {
@@ -110,6 +124,9 @@ export function reducer(state: AppState, a: Action): AppState {
       return { ...state, ingesting: { name: a.name } };
     case 'ingest-done':
       return { ...state, ingesting: null, lastBorn: a.docId };
+    case 'set-lang':
+      localStorage.setItem('rc.lang', a.lang);
+      return { ...state, lang: a.lang };
     case 'demo-reset':
       localStorage.removeItem(LS_KEY);
       return {

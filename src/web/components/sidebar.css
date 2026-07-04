@@ -150,3 +150,22 @@
   transition: color var(--t-fast), border-color var(--t-fast);
 }
 .sidebar-reset:hover { color: var(--err); border-color: var(--err); }
+
+.sidebar-langs {
+  display: flex;
+  gap: 4px;
+  padding: var(--sp-2) var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+.sidebar-lang {
+  flex: 1;
+  padding: 3px 0;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+  border: 1px solid transparent;
+  letter-spacing: 0.06em;
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+.sidebar-lang:hover { color: var(--text); }
+.sidebar-lang.active { color: var(--accent-strong); border-color: var(--accent); }
