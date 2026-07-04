@@ -97,9 +97,12 @@ workspace (agent team, workspace operations, corpus manifest) is plain serializa
 and the whole agent sits behind two seams (`ModelDriver` for inference, one `docs.json`
 fetch for the corpus). Making it enterprise-ready is perimeter work, not a rewrite:
 
-- **Identity and organizations.** An IdP (Keycloak self-hosted, or WorkOS for SSO/SAML)
-  with organizations owning workspaces and role-based membership (admin, technician,
-  viewer). Workspaces belong to the organization, so a calibrated team is shared knowledge.
+- **Identity and organizations.** The demo deployment already ships real accounts:
+  `AUTH_ENABLED=1` on the VM server turns on signup/login (scrypt, HMAC-signed sessions),
+  a per-user store that follows the account across browsers, and per-account daily
+  inference quotas. The enterprise step up is an IdP (Keycloak self-hosted, or WorkOS for
+  SSO/SAML) with organizations owning workspaces and role-based membership (admin,
+  technician, viewer).
 - **Database: Vultr Managed PostgreSQL.** The schema is already drawn by the code:
   `workspaces(id, org_id, name, team JSONB, ops JSONB)` is the in-app `WorkspaceSnapshot`,
   conversations persist their steps with the full reasoning timeline (a structured audit
