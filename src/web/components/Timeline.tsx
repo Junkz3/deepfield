@@ -69,10 +69,13 @@ export function Timeline({ events, running, onOpenPage }: {
     <div className="timeline">
       {events.map((e, i) => {
         const isDecision = e.phase === 'retrieve' && !!e.detail;
+        // The agent naming the ops its verdict needs is an autonomous call,
+        // same rank as the re-retrieve decision: same visual prominence.
+        const isOpRequest = e.phase === 'tools' && e.summary.startsWith('Agent requested:');
         const isLast = i === events.length - 1;
-        const color = isDecision ? 'var(--accent)' : PHASE_COLOR[e.phase];
+        const color = isDecision || isOpRequest ? 'var(--accent)' : PHASE_COLOR[e.phase];
         return (
-          <div key={i} className={`timeline-row fade-up ${isDecision ? 'decision' : ''}`}>
+          <div key={i} className={`timeline-row fade-up ${isDecision || isOpRequest ? 'decision' : ''}`}>
             <span className="timeline-rail">
               <span
                 className={`timeline-node ${running && isLast ? 'live' : ''}`}
@@ -86,6 +89,7 @@ export function Timeline({ events, running, onOpenPage }: {
             </span>
             <span className="timeline-body">
               {isDecision && <span className="timeline-eyebrow mono">AUTONOMOUS RE-RETRIEVE</span>}
+              {isOpRequest && <span className="timeline-eyebrow mono">AGENT-REQUESTED OPERATIONS</span>}
               <span className="timeline-summary">{e.summary}</span>
               {e.detail && <span className="timeline-detail">{e.detail}</span>}
               {e.hitPages && e.hitPages.length > 0 && (
