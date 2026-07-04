@@ -3,6 +3,7 @@ import type { ModelDriver } from './driver';
 import { candidatePages, pageTitle } from './taxonomy';
 import { checkMeasurement, checkSafety, getPart } from './tools';
 import { computeConfidence, workOrderConfidence } from './confidence';
+import { workflowProfile } from './workflow';
 
 export interface StepInput { conversation: Conversation; docs: Document[]; userInput?: string }
 
@@ -131,7 +132,8 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   // QUESTION intent: informational asks deserve a full grounded ANSWER, not
   // a diagnosis mold. Same retrieval, free-form cited prose out.
   const deepDive = userInput === 'explain-deep';
-  if ((plan.intent === 'question' || deepDive) && driver.answer) {
+  const answerMode = workflowProfile().decisionMode === 'answer';
+  if ((answerMode || plan.intent === 'question' || deepDive) && driver.answer) {
     yield emit({ phase: 'reason', summary: deepDive ? 'Re-reading the cited pages in depth' : 'Reading the pages to answer' });
     const questionText = deepDive
       ? `Explain in depth: ${conversation.symptom} (device: ${conversation.device})`
@@ -198,8 +200,8 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     }
   }
 
-  // TOOLS
-  yield emit({ phase: 'tools', summary: 'Checking parts and safety' });
+  // TOOLS (physical-world phases only where the workflow has them)
+  yield emit({ phase: 'tools', summary: workflowProfile().physicalTools ? 'Checking parts and safety' : 'Cross-checking the cited sources' });
   // Part lookup by machine key; devices without a catalog entry get an honest
   // OEM-sourcing line instead of a dishwasher part.
   const compKey = `${diagnosis.componentKey ?? ''} ${diagnosis.component}`.toLowerCase();
