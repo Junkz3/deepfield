@@ -107,29 +107,87 @@
 
 .timeline-row {
   display: grid;
-  grid-template-columns: 14px 86px 1fr;
+  grid-template-columns: 22px 86px 1fr;
   gap: var(--sp-2);
-  align-items: baseline;
-  padding: 3px 0;
+  align-items: start;
+  padding: 5px 0;
 }
 
 .timeline-row.decision {
   background: var(--accent-dim);
+  border-left: 2px solid var(--accent);
   border-radius: var(--radius-sm);
-  padding: 6px var(--sp-2);
-  margin: 3px 0;
+  padding: 6px var(--sp-2) 6px 6px;
+  /* pull left by border + padding so the rail column stays aligned */
+  margin: 3px calc(-1 * var(--sp-2)) 3px -8px;
 }
 
-.timeline-rail { display: flex; justify-content: center; align-self: stretch; align-items: center; }
-.timeline-dot { width: 7px; height: 7px; border-radius: 50%; }
-.timeline-dot.live { animation: rc-pulse 1s ease-in-out infinite; box-shadow: 0 0 8px currentColor; }
+/* The rail: a continuous line threading the phase nodes together */
+.timeline-rail {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-self: stretch;
+  align-items: flex-start;
+}
+.timeline-rail::before {
+  content: '';
+  position: absolute;
+  /* overshoot into the inter-row padding so segments join into one line */
+  top: -16px;
+  bottom: -16px;
+  left: 50%;
+  width: 1px;
+  background: var(--line-strong);
+}
+.timeline-row:first-child .timeline-rail::before { top: 10px; }
+.timeline-row:last-child .timeline-rail::before { bottom: calc(100% - 10px); }
+.timeline-row:only-child .timeline-rail::before { display: none; }
 
-.timeline-phase { font-size: var(--fs-xs); letter-spacing: 0.08em; }
+.timeline-node {
+  position: relative;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, currentColor 13%, var(--bg1));
+  border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+}
+.timeline-node.live {
+  animation: rc-pulse 1s ease-in-out infinite;
+  box-shadow: 0 0 10px color-mix(in srgb, currentColor 60%, transparent);
+}
 
-.timeline-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.timeline-summary { font-size: var(--fs-sm); }
+.timeline-phase {
+  font-size: var(--fs-xs);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  line-height: 20px; /* optical alignment with the 20px node */
+}
+
+.timeline-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-top: 2px; }
+.timeline-summary { font-size: var(--fs-sm); line-height: 1.45; }
 .timeline-detail { font-size: var(--fs-xs); color: var(--accent-strong); font-style: italic; }
-.timeline-hits { font-size: var(--fs-xs); color: var(--info); letter-spacing: 0.06em; }
+
+.timeline-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+}
+
+.timeline-hits { display: flex; flex-wrap: wrap; gap: var(--sp-1); padding-top: 2px; }
+.timeline-hit {
+  padding: 1px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--info);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.04em;
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+.timeline-hit:hover { border-color: var(--info); background: rgba(89, 194, 255, 0.1); }
 
 /* ---- Confidence ---- */
 
@@ -683,3 +741,41 @@
   border-color: rgba(255, 255, 255, 0.08);
 }
 .conv-reply input:disabled { opacity: 0.5; }
+
+/* ---- Docked page viewer: conversation open, page lives in the universe half ---- */
+
+.cite-lightbox.docked {
+  /* clear the sidebar (264px) plus the glass chat panel (left: sp-4 inside
+     .main, width: min(640px, 46%)) plus a breathing margin */
+  left: calc(264px + min(640px, 46%) + (var(--sp-4) * 2));
+  background: linear-gradient(90deg, rgba(5, 7, 10, 0.2), rgba(5, 7, 10, 0.72) 30%);
+  padding: var(--sp-7) var(--sp-5) var(--sp-6);
+}
+.cite-lightbox.docked .cite-img-wrap.zoomed img {
+  height: min(72vh, 1000px);
+  max-width: calc(100vw - 264px - min(640px, 46%) - 120px);
+}
+/* The docked container is animated (transform), which turns it into the
+   containing block for fixed children: switch its chrome to absolute so
+   meta, actions and nav stay INSIDE the universe half, off the chat. */
+.cite-lightbox.docked .lightbox-meta {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 92%;
+}
+.cite-lightbox.docked .lightbox-actions { position: absolute; }
+.cite-lightbox.docked .lightbox-nav {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 94%;
+}
+
+/* The page rises out of the corpus into the frame */
+@keyframes rc-page-rise {
+  0% { transform: translateY(9%) scale(0.5); opacity: 0; filter: brightness(1.9); }
+  55% { opacity: 1; }
+  100% { transform: none; opacity: 1; filter: none; }
+}
+.page-rise { animation: rc-page-rise 0.42s cubic-bezier(0.22, 0.9, 0.3, 1) both; }

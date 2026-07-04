@@ -42,11 +42,12 @@ function CiteChips({ citations, onOpen }: { citations: Citation[]; onOpen: (c: C
   );
 }
 
-function StepCard({ step, isLast, onAction, onOpenCite }: {
+function StepCard({ step, isLast, onAction, onOpenCite, onOpenPage }: {
   step: GuidedStep;
   isLast: boolean;
   onAction: (action: string) => void;
   onOpenCite: (c: Citation) => void;
+  onOpenPage: (docId: string, page: number) => void;
 }) {
   const statusColor =
     step.status === 'ok' ? 'var(--ok)' : step.status === 'no-evidence' ? 'var(--warn)' : step.status === 'error' ? 'var(--err)' : 'var(--info)';
@@ -56,7 +57,7 @@ function StepCard({ step, isLast, onAction, onOpenCite }: {
         <span className="step-index mono">STEP {step.index + 1}</span>
         <span className="step-status mono" style={{ color: statusColor }}>{step.status.toUpperCase()}</span>
       </header>
-      <Timeline events={step.phaseEvents} running={false} />
+      <Timeline events={step.phaseEvents} running={false} onOpenPage={onOpenPage} />
       <p className="step-instruction">{step.instruction}</p>
       <CiteChips citations={step.citations} onOpen={onOpenCite} />
       <ConfidenceMeter value={step.confidence} reason={step.confidenceReason} />
@@ -101,6 +102,7 @@ export function ConversationView({ id }: { id: string }) {
 
   const hasCompilableStep = conv.steps.some((s) => s.status === 'ok' && s.diagnosis);
   const openCite = (c: Citation) => dispatch({ type: 'open-lightbox', docId: c.docId, page: c.page });
+  const openPage = (docId: string, page: number) => dispatch({ type: 'open-lightbox', docId, page });
 
   const onAction = (action: string) => {
     if (action === 'compile-work-order' || action.startsWith('order-part:')) {
@@ -146,6 +148,7 @@ export function ConversationView({ id }: { id: string }) {
               isLast={i === conv.steps.length - 1 && !live.running}
               onAction={onAction}
               onOpenCite={openCite}
+              onOpenPage={openPage}
             />
           </div>
         ))}
@@ -161,7 +164,7 @@ export function ConversationView({ id }: { id: string }) {
                 {state.driverKind === 'vultr' ? 'REASONING ON VULTR' : 'REASONING'}
               </span>
             </header>
-            <Timeline events={live.events} running />
+            <Timeline events={live.events} running onOpenPage={openPage} />
           </article>
         )}
       </div>

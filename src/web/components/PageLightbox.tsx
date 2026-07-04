@@ -44,6 +44,9 @@ function samplePatchStyles(img: HTMLImageElement, blocks: TextBlock[]): PatchSty
 export function PageLightbox() {
   const { state, dispatch, docs } = useApp();
   const lb = state.lightbox;
+  // With a conversation open, the page docks into the universe half so the
+  // chat stays usable: click another citation and this viewer just swaps.
+  const docked = state.activeView.kind === 'conversation';
   const [translation, setTranslation] = useState<string | null>(null);
   const [blocks, setBlocks] = useState<TextBlock[] | null>(null);
   const [showTranslated, setShowTranslated] = useState(true);
@@ -63,6 +66,8 @@ export function PageLightbox() {
   useEffect(() => {
     if (!lb || !doc) return;
     const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
       if (e.key === 'Escape') dispatch({ type: 'close-lightbox' });
       if (e.key === 'ArrowRight' && idx < doc.pages.length - 1) {
         dispatch({ type: 'open-lightbox', docId: doc.id, page: doc.pages[idx + 1].page });
@@ -122,7 +127,7 @@ export function PageLightbox() {
   };
 
   return (
-    <div className="cite-lightbox" onClick={() => dispatch({ type: 'close-lightbox' })}>
+    <div className={`cite-lightbox ${docked ? 'docked' : ''}`} onClick={() => dispatch({ type: 'close-lightbox' })}>
       <div className="lightbox-meta mono">
         {doc.brand} {doc.model} — {isVideo ? `segment @ ${mmss(page.timestamp!)}: "${page.text}"` : `p.${page.page} (${page.kind})`} · {doc.sourceRights}
       </div>
@@ -154,7 +159,7 @@ export function PageLightbox() {
             />
           </div>
         ) : (
-          <span className="cite-img-wrap zoomed">
+          <span className="cite-img-wrap zoomed page-rise" key={`${doc.id}-${page.page}`}>
             <img
               ref={imgRef}
               src={page.imageUrl}
