@@ -434,7 +434,7 @@
   position: absolute;
   top: var(--sp-4);
   left: var(--sp-4);
-  bottom: var(--sp-4);
+  bottom: calc(var(--sp-4) + var(--kb, 0px));
   width: min(640px, 46%);
   z-index: 15;
   display: flex;
@@ -478,7 +478,8 @@
 
 .cmdbar-zone {
   position: absolute;
-  bottom: calc(var(--sp-6) + env(safe-area-inset-bottom, 0px));
+  /* --kb: virtual-keyboard overlap (see main.tsx); 0 outside iOS typing */
+  bottom: calc(var(--sp-6) + env(safe-area-inset-bottom, 0px) + var(--kb, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 20;

@@ -155,7 +155,7 @@
 
 .galaxy-command {
   position: absolute;
-  bottom: var(--sp-5);
+  bottom: calc(var(--sp-5) + var(--kb, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 20;
