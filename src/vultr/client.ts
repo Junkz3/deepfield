@@ -5,6 +5,7 @@ import type { AgentSpec } from '../agent/workflow';
 import { activeAgents } from '../agent/workflow';
 import type { TeamCalibrationInput } from '../agent/team';
 import { heuristicTeam, parseTeam, teamPrompt } from '../agent/team';
+import { activeTools } from '../agent/tools';
 
 export type Transport = (path: string, body: unknown) => Promise<any>;
 
@@ -203,7 +204,22 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
   }
 
   async diagnose(q: { device: string; symptom: string }, evidence: Page[], techPhoto?: string): Promise<Diagnosis> {
-    const parts: unknown[] = [{ type: 'text', text: `You are ${workflowProfile().agentRole} producing a grounded verdict. ${workflowProfile().subjectNoun}: ${q.device}. ${workflowProfile().issueNoun}: ${q.symptom}.\nGround yourself ONLY in the attached manual pages${techPhoto ? ' and the technician photo (last image)' : ''}. Return STRICT JSON: {"component": string, "cause": string, "checks": [string, string, string], "instruction": string, "componentKey": "heater"|"thermistor"|"sensor"|"pump"|"motor"|"board"|"wiring"|"other"} - checks must be concrete ACTIONS the technician performs (measure X, inspect Y), ordered, with measurable values when the pages give them; instruction = one or two sentences guiding the technician: the FIRST concrete action with its expected measurable value from the pages, then what the result decides next; varied phrasing, no boilerplate prefix. Write component/cause/checks in ${AGENT_LANG}; keep part numbers and error codes verbatim. If a page gives a STEP-BY-STEP troubleshooting procedure with several candidate causes for this exact malfunction, that IS a valid diagnosis: component = the target of the procedure's first step, cause = the malfunction line as printed, checks = the procedure's first steps in their printed order (cite the paragraph numbers). Only set component to "insufficient evidence" when no retained page addresses the symptom at all. Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.` }];
+    // The workspace registry rides INSIDE the verdict call: the model reads
+    // the available ops and requests the ones its verdict needs - the agent
+    // chooses its tools, nothing is hard-wired (and zero extra calls).
+    // Footprint matters: a verbose op section mid-prompt degraded the
+    // diagnosis fields themselves (component drifted to the symptom, the
+    // rumination regime came back). One short sentence at the END, and the
+    // shape only gains a defaulted "tools": [].
+    const ops = workflowProfile().physicalTools ? activeTools() : [];
+    const basePrompt = (withOps: boolean) => {
+      const opsSection = withOps && ops.length > 0
+        ? ` After the diagnosis fields are set, request follow-up workspace operations in "tools" when they apply: ${ops.map((t) => `{"id":"${t.id}","args":{...}}`).join(', ')} (part_lookup with args.component when one replaceable component is the prime suspect; safety_notes with args.operation before hands-on work; measurement_check with args.component when a reading would decide). Never let tool choice alter the diagnosis fields.`
+        : '';
+      const jsonTools = withOps && ops.length > 0 ? ', "tools": []' : '';
+      return `You are ${workflowProfile().agentRole} producing a grounded verdict. ${workflowProfile().subjectNoun}: ${q.device}. ${workflowProfile().issueNoun}: ${q.symptom}.\nGround yourself ONLY in the attached manual pages${techPhoto ? ' and the technician photo (last image)' : ''}. Return STRICT JSON: {"component": string, "cause": string, "checks": [string, string, string], "instruction": string, "componentKey": "heater"|"thermistor"|"sensor"|"pump"|"motor"|"board"|"wiring"|"other"${jsonTools}} - checks must be concrete ACTIONS the technician performs (measure X, inspect Y), ordered, with measurable values when the pages give them; instruction = one or two sentences guiding the technician: the FIRST concrete action with its expected measurable value from the pages, then what the result decides next; varied phrasing, no boilerplate prefix. Write component/cause/checks in ${AGENT_LANG}; keep part numbers and error codes verbatim.${opsSection} If a page gives a STEP-BY-STEP troubleshooting procedure with several candidate causes for this exact malfunction, that IS a valid diagnosis: component = the target of the procedure's first step, cause = the malfunction line as printed, checks = the procedure's first steps in their printed order (cite the paragraph numbers). Only set component to "insufficient evidence" when no retained page addresses the symptom at all. Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.`;
+    };
+    const parts: unknown[] = [{ type: 'text', text: basePrompt(true) }];
     for (const p of evidence.slice(0, 4)) parts.push({ type: 'image_url', image_url: { url: await toDataUrl(p.imageUrl) } });
     const fallback: Diagnosis = {
       component: 'insufficient evidence',
@@ -216,10 +232,27 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
     // SAME sewing case answers in 16s with 4 pages, burns the cap with 1-2 -
     // less context means MORE deliberation). So retry first with a hard
     // brevity directive at full context, then shed pages for density.
-    for (const [i, take] of [4, 4, 2, 1].entries()) {
-      const head = i === 0 ? parts[0]
-        : { type: 'text', text: `YOUR PREVIOUS ATTEMPT WAS CUT BY THE TOKEN CAP BEFORE ANY OUTPUT. Do NOT deliberate: at most 20 words of internal reasoning, then the JSON object immediately.\n${(parts[0] as { text: string }).text}` };
-      const attempt = [head, ...parts.slice(1, 1 + Math.min(take, evidence.length))];
+    // Attempt ladder. The op offer only rides the FIRST attempt: on sparse
+    // evidence it re-feeds the rumination regime (measured: sewing burned
+    // the cap 3/3 with ops anywhere in the prompt). Attempt 2 is the exact
+    // pre-registry prompt - the setup those cases passed on - then the
+    // strict/shedding retries for the two cap-burn regimes.
+    const ladder: { withOps: boolean; strict: boolean; take: number }[] = [
+      { withOps: true, strict: false, take: 4 },
+      ...(ops.length > 0 ? [{ withOps: false, strict: false, take: 4 }] : []),
+      { withOps: false, strict: true, take: 4 },
+      { withOps: false, strict: true, take: 2 },
+      { withOps: false, strict: true, take: 1 },
+    ];
+    for (const step of ladder) {
+      const base = basePrompt(step.withOps);
+      const head = {
+        type: 'text',
+        text: step.strict
+          ? `YOUR PREVIOUS ATTEMPT WAS CUT BY THE TOKEN CAP BEFORE ANY OUTPUT. Do NOT deliberate: at most 20 words of internal reasoning, then the JSON object immediately.\n${base}`
+          : base,
+      };
+      const attempt = [head, ...parts.slice(1, 1 + Math.min(step.take, evidence.length))];
       if (techPhoto) attempt.push({ type: 'image_url', image_url: { url: techPhoto } });
       const text = await chatText(this.t, MODELS.omni, attempt, 8000);
       const d = extractJson<Diagnosis>(text, fallback);

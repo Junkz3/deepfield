@@ -11,7 +11,7 @@ export interface Document { id: string; filename: string; format: DocFormat; cat
 export interface Citation { docId: string; page: number; region?: Region; quote?: string; timestamp?: number; label: string; title?: string }
 export interface ScoredPage { page: Page; score: number }
 export interface PlanAction { goal: string; queries: string[]; intent?: 'diagnose' | 'question'; agentId?: string }
-export interface Diagnosis { component: string; cause: string; checks: string[]; instruction?: string; componentKey?: string }
+export interface Diagnosis { component: string; cause: string; checks: string[]; instruction?: string; componentKey?: string; tools?: { id: string; args?: Record<string, string> }[] }
 export interface PartLine { ref: string; name: string; inStock: boolean; price?: number; leadDays?: number }
 export interface SafetyInfo { lines: string[]; citations: Citation[] }
 export interface MeasurementVerdict { withinSpec: boolean; specRange: string; verdict: string; suggestedComponent?: string }

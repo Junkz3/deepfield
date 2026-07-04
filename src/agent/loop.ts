@@ -1,16 +1,11 @@
 import type { Conversation, Diagnosis, Document, GuidedStep, PartLine, PhaseEvent, SafetyInfo, ScoredPage, WorkOrder } from './types';
 import type { ModelDriver } from './driver';
-import { candidatePages, pageTitle } from './taxonomy';
-import { checkMeasurement, checkSafety, getPart } from './tools';
+import { candidatePages, pageTitle, trimPool } from './taxonomy';
+import { activeTools, checkMeasurement } from './tools';
 import { computeConfidence, workOrderConfidence } from './confidence';
 import { activeAgents, setWorkflowProfile, workflowProfile } from './workflow';
 
 export interface StepInput { conversation: Conversation; docs: Document[]; userInput?: string }
-
-const PART_FOR: Record<string, string> = {
-  'heating element': 'W10518394',
-  thermistor: 'WPW10352973',
-};
 
 const toCitation = (s: ScoredPage) => ({
   docId: s.page.docId, page: s.page.page, region: s.page.region,
@@ -54,21 +49,25 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     if (verdict.withinSpec && verdict.suggestedComponent) {
       yield emit({ phase: 'reason', summary: `Hypothesis changed: ${component} is OK, pivoting to ${verdict.suggestedComponent}` });
       const diagnosis = await driver.diagnose(q, []); // pivot contract
-      const partRef = PART_FOR[verdict.suggestedComponent] ?? PART_FOR[diagnosis.component.toLowerCase()] ?? 'WPW10352973';
+      const ctx = { device: conversation.device, component: verdict.suggestedComponent };
+      const partTool = activeTools().find((t) => t.id === 'part_lookup');
+      const safetyTool = activeTools().find((t) => t.id === 'safety_notes');
       yield emit({ phase: 'tools', summary: 'Checking replacement part availability' });
-      const part = await getPart(partRef);
+      const partRun = partTool ? await partTool.run({ component: verdict.suggestedComponent }, ctx) : undefined;
+      const safetyRun = safetyTool ? await safetyTool.run({ operation: `replace ${verdict.suggestedComponent}` }, ctx) : undefined;
       yield emit({ phase: 'decide', summary: `Next: test the ${verdict.suggestedComponent}` });
       const conf = computeConfidence({ exactCodeMatch: true, corroboratingCitations: 1, requiredPageMissing: false });
+      const part = partRun?.part;
       return {
         index: conversation.steps.length, phaseEvents: events, agentLabel,
         instruction: diagnosis.instruction ? `${verdict.verdict} ${diagnosis.instruction}` : `${verdict.verdict} Now test the ${verdict.suggestedComponent}: ${diagnosis.checks[0]}`,
         citations: [], proposedNext: [
-          { label: `Order ${part.name} (${part.ref})`, action: `order-part:${part.ref}` },
+          ...(part ? [{ label: `Order ${part.name} (${part.ref})`, action: `order-part:${part.ref}` }] : []),
           { label: `${verdict.suggestedComponent} also in spec`, action: `report-measurement:${verdict.suggestedComponent}:52000` },
           { label: 'Compile work order', action: 'compile-work-order' },
         ],
         confidence: conf.value, confidenceReason: conf.reason, status: 'ok',
-        diagnosis, parts: [part], safety: await checkSafety(`replace ${verdict.suggestedComponent}`),
+        diagnosis, parts: part ? [part] : undefined, safety: safetyRun?.safety,
       };
     }
   }
@@ -85,16 +84,18 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     // Later rounds search what is NOT already retained: each round discovers.
     const pool = round === 0 ? candidates
       : candidates.filter((p) => !retrieved.some((r) => r.page.docId === p.docId && r.page.page === p.page));
+    // Text-side prefilter: the visual rerank pays ~900 tokens per page image.
+    const trimmed = trimPool(query, pool);
     let results: ScoredPage[];
     try {
-      results = await driver.retrieve(query, pool);
+      results = await driver.retrieve(query, trimmed);
     } catch (err) {
       // A transient rerank 500 must not kill the step. With pages already
       // retained, reason over those; with nothing yet, one retry then give up.
       if (retrieved.length > 0) break;
       yield emit({ phase: 'retrieve', summary: 'Retrieval hiccup - retrying' });
       await new Promise((r) => setTimeout(r, 2000));
-      results = await driver.retrieve(query, pool);
+      results = await driver.retrieve(query, trimmed);
     }
     // Dynamic top = union of the classic top-3 and anything within 85% of
     // the best score, capped at 5. Never LESS context than a fixed top-3
@@ -235,7 +236,8 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   if (refs.length > 0) {
     yield emit({ phase: 'reason', summary: `Following the manual's cross-reference${refs.length > 1 ? 's' : ''}: ${refs.join(', ')}` });
     const pool = candidates.filter((p) => !retrieved.some((r) => r.page.docId === p.docId && r.page.page === p.page));
-    const followed = await driver.retrieve(`${refs.join(' ')} ${diagnosis.component} procedure`, pool);
+    const refQuery = `${refs.join(' ')} ${diagnosis.component} procedure`;
+    const followed = await driver.retrieve(refQuery, trimPool(refQuery, pool));
     const extra = followed.filter((r) => r.score >= 1.5).slice(0, 2);
     if (extra.length > 0) {
       retrieved.push(...extra);
@@ -248,17 +250,28 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     }
   }
 
-  // TOOLS (physical-world phases only where the workflow has them)
-  yield emit({ phase: 'tools', summary: workflowProfile().physicalTools ? 'Checking parts and safety' : 'Cross-checking the cited sources' });
-  // Part lookup by machine key; devices without a catalog entry get an honest
-  // OEM-sourcing line instead of a dishwasher part.
-  const compKey = `${diagnosis.componentKey ?? ''} ${diagnosis.component}`.toLowerCase();
-  const partRef = PART_FOR[compKey.trim()] ?? (compKey.includes('heat') ? PART_FOR['heating element'] : compKey.includes('therm') ? PART_FOR['thermistor'] : undefined);
-  const part = partRef
-    ? await getPart(partRef)
-    : { ref: 'OEM', name: `${diagnosis.component} (source via OEM parts catalog)`, inStock: false, leadDays: undefined };
-  const safety = await checkSafety(`${conversation.device.toLowerCase().includes('hmmwv') || conversation.device.toLowerCase().includes('vehicle') ? 'vehicle: ' : ''}replace ${diagnosis.component}`);
-  yield emit({ phase: 'tools', summary: `${part.name}: ${part.inStock ? 'in stock' : part.leadDays ? `lead time ${part.leadDays}d` : 'order from OEM'} - safety notes attached` });
+  // TOOLS: the agent CHOSE its operations inside the verdict (diagnosis.tools
+  // names registry ops); the loop only executes what was requested. Nothing
+  // is hard-wired: an answer-mode workspace exposes no ops at all.
+  const ops = workflowProfile().physicalTools ? activeTools() : [];
+  const requested = (diagnosis.tools ?? [])
+    .map((req) => ({ req, tool: ops.find((t) => t.id === req.id) }))
+    .filter((x): x is { req: { id: string; args?: Record<string, string> }; tool: (typeof ops)[number] } => x.tool !== undefined);
+  yield emit({
+    phase: 'tools',
+    summary: requested.length > 0
+      ? `Agent requested: ${requested.map((x) => x.tool.label.toLowerCase()).join(', ')}`
+      : 'Cross-checking the cited sources',
+  });
+  let part: PartLine | undefined;
+  let safety: SafetyInfo | undefined;
+  const toolCtx = { device: conversation.device, component: `${diagnosis.componentKey ?? ''} ${diagnosis.component}`.trim() };
+  for (const { req, tool } of requested) {
+    const run = await tool.run(req.args ?? {}, toolCtx);
+    part = part ?? run.part;
+    safety = safety ?? run.safety;
+    yield emit({ phase: 'tools', summary: `${tool.label}: ${run.summary}` });
+  }
 
   // DECIDE
   const citations = retrieved.map(toCitation);
@@ -282,13 +295,14 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   // Proposed actions follow the DIAGNOSIS, not a fixed script. The machine
   // key stays English even when the display language does not.
   const component = `${diagnosis.componentKey ?? ''} ${diagnosis.component}`.toLowerCase();
+  const canMeasure = ops.some((t) => t.id === 'measurement_check');
   const proposedNext: { label: string; action: string }[] = [];
-  if (component.includes('heat')) {
+  if (canMeasure && component.includes('heat')) {
     proposedNext.push(
       { label: 'Heater measured 22 ohms (in spec)', action: 'report-measurement:heating element:22' },
       { label: 'Heater open circuit (0 ohms)', action: 'report-measurement:heating element:0' },
     );
-  } else if (component.includes('thermistor') || component.includes('sensor')) {
+  } else if (canMeasure && (component.includes('thermistor') || component.includes('sensor'))) {
     proposedNext.push({ label: 'Sensor reads in spec', action: 'report-measurement:thermistor:52000' });
   }
   const hasVideo = candidates.some((p) => p.kind === 'video-segment');
@@ -303,7 +317,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     citations,
     proposedNext: proposedNext.slice(0, 5),
     confidence: conf.value, confidenceReason: conf.reason, status: 'ok',
-    diagnosis, parts: [part], safety,
+    diagnosis, parts: part ? [part] : undefined, safety,
   };
 }
 

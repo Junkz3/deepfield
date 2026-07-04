@@ -110,7 +110,16 @@ export class FakeDriver implements ModelDriver {
       };
     }
     const flipped = evidence.length === 0; // loop passes [] after an in-spec measurement pivot
-    return flipped ? E3_FLIPPED_DIAGNOSIS : E3_DIAGNOSIS;
+    // The offline script requests its ops like the live model would.
+    return flipped
+      ? E3_FLIPPED_DIAGNOSIS
+      : {
+        ...E3_DIAGNOSIS,
+        tools: [
+          { id: 'part_lookup', args: { component: 'heating element' } },
+          { id: 'safety_notes', args: { operation: 'replace heating element' } },
+        ],
+      };
   }
 
   async calibrateTeam(input: TeamCalibrationInput): Promise<AgentSpec[]> {
