@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { Document } from '../../agent/types';
 import { useApp } from '../store';
+import displayFont from '@fontsource/space-grotesk/files/space-grotesk-latin-500-normal.woff?url';
 
 const R = 2.1; // shell radius of the file planet
 
@@ -153,11 +154,33 @@ function OrbitRings() {
 function AgentCore({ scanning }: { scanning: boolean }) {
   const halo = useRef<THREE.Sprite>(null);
   const pulse = useRef<THREE.Mesh>(null);
+  const gyroA = useRef<THREE.Group>(null);
+  const gyroB = useRef<THREE.Group>(null);
+  const gyroC = useRef<THREE.Group>(null);
+  const orbiters = useRef<THREE.Points>(null);
   const haloMap = useMemo(() => radialSprite('255, 178, 92'), []);
+
+  const orbiterGeom = useMemo(() => {
+    const n = 42;
+    const arr = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const r = 0.34 + (i % 5) * 0.035;
+      arr[i * 3] = Math.cos(a) * r;
+      arr[i * 3 + 1] = Math.sin(a * 3.1) * 0.05;
+      arr[i * 3 + 2] = Math.sin(a) * r;
+    }
+    return arr;
+  }, []);
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
-    if (halo.current) halo.current.scale.setScalar(1.9 + Math.sin(t * 1.1) * 0.12);
+    if (halo.current) halo.current.scale.setScalar(1.35 + Math.sin(t * 1.1) * 0.07);
+    // gyroscope: three thin rings precessing on different axes
+    if (gyroA.current) { gyroA.current.rotation.x = t * 0.42; gyroA.current.rotation.y = t * 0.18; }
+    if (gyroB.current) { gyroB.current.rotation.y = -t * 0.31; gyroB.current.rotation.z = t * 0.22; }
+    if (gyroC.current) { gyroC.current.rotation.z = t * 0.15; gyroC.current.rotation.x = -t * 0.26; }
+    if (orbiters.current) orbiters.current.rotation.y = t * 0.5;
     if (pulse.current) {
       const phase = (t % 1.3) / 1.3;
       pulse.current.visible = scanning;
@@ -170,20 +193,54 @@ function AgentCore({ scanning }: { scanning: boolean }) {
 
   return (
     <group>
+      {/* white-hot nucleus in a warm shell */}
       <mesh>
-        <sphereGeometry args={[0.26, 32, 32]} />
-        <meshBasicMaterial color="#ffc678" />
+        <sphereGeometry args={[0.085, 24, 24]} />
+        <meshBasicMaterial color="#fff7ea" />
       </mesh>
-      <sprite ref={halo} scale={[1.9, 1.9, 1]}>
-        <spriteMaterial map={haloMap} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
+      <mesh>
+        <sphereGeometry args={[0.15, 24, 24]} />
+        <meshBasicMaterial color="#ffb454" transparent opacity={0.28} blending={THREE.AdditiveBlending} depthWrite={false} />
+      </mesh>
+      <sprite ref={halo} scale={[1.35, 1.35, 1]}>
+        <spriteMaterial map={haloMap} transparent opacity={0.75} depthWrite={false} blending={THREE.AdditiveBlending} />
       </sprite>
+
+      {/* precessing gyroscope rings */}
+      <group ref={gyroA}>
+        <mesh>
+          <torusGeometry args={[0.24, 0.0035, 8, 96]} />
+          <meshBasicMaterial color="#ffd9a0" transparent opacity={0.85} depthWrite={false} blending={THREE.AdditiveBlending} />
+        </mesh>
+      </group>
+      <group ref={gyroB}>
+        <mesh>
+          <torusGeometry args={[0.3, 0.0028, 8, 96]} />
+          <meshBasicMaterial color="#59c2ff" transparent opacity={0.5} depthWrite={false} blending={THREE.AdditiveBlending} />
+        </mesh>
+      </group>
+      <group ref={gyroC}>
+        <mesh>
+          <torusGeometry args={[0.37, 0.0022, 8, 96]} />
+          <meshBasicMaterial color="#ffb454" transparent opacity={0.4} depthWrite={false} blending={THREE.AdditiveBlending} />
+        </mesh>
+      </group>
+
+      {/* close-orbit particles */}
+      <points ref={orbiters}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[orbiterGeom, 3]} />
+        </bufferGeometry>
+        <pointsMaterial color="#ffd9a0" size={0.014} transparent opacity={0.8} depthWrite={false} blending={THREE.AdditiveBlending} sizeAttenuation />
+      </points>
+
       <mesh ref={pulse} rotation={[Math.PI / 2, 0, 0]} visible={false}>
         <torusGeometry args={[1, 0.016, 8, 64]} />
         <meshBasicMaterial color="#ffb454" transparent depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
       <pointLight intensity={40} distance={26} color="#ffd9a0" />
-      <Billboard position={[0, -0.62, 0]}>
-        <Text fontSize={0.11} color="#c8964f" letterSpacing={0.34} anchorX="center" outlineWidth={0.004} outlineColor="#080b10">
+      <Billboard position={[0, -0.58, 0]}>
+        <Text font={displayFont} fontSize={0.082} color="#b9884e" letterSpacing={0.5} anchorX="center" outlineWidth={0.003} outlineColor="#080b10">
           AGENT
         </Text>
       </Billboard>
@@ -298,7 +355,7 @@ function FileCard({ node, targetPos, ghost, isHit, hitCount, onHover, onSelect }
           </Text>
         )}
         {isHit && hitCount > 0 && (
-          <Text position={[0, 0.35, 0]} fontSize={0.085} color="#ffc678" anchorX="center" outlineWidth={0.005} outlineColor="#080b10">
+          <Text font={displayFont} position={[0, 0.35, 0]} fontSize={0.085} color="#ffc678" anchorX="center" outlineWidth={0.005} outlineColor="#080b10">
             {`${hitCount} page${hitCount > 1 ? 's' : ''} cited`}
           </Text>
         )}
@@ -372,7 +429,7 @@ function FloatingPage({ url, label, index, total, anchor, color, onClick }: {
           <meshBasicMaterial map={tex} toneMapped={false} />
         </mesh>
         {label && (
-          <Text position={[0, -0.44, 0]} fontSize={0.1} color="#ffc678" anchorX="center" outlineWidth={0.006} outlineColor="#080b10">
+          <Text font={displayFont} position={[0, -0.44, 0]} fontSize={0.1} color="#ffc678" anchorX="center" outlineWidth={0.006} outlineColor="#080b10">
             {label}
           </Text>
         )}
@@ -507,7 +564,7 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
         const catInScope = nodes.some((n) => n.doc.category === c.label && inScope(n.doc.id));
         return (
           <Billboard key={c.label} position={c.dir.clone().multiplyScalar(R + 0.72).toArray()}>
-            <Text fontSize={0.082} color={c.color} anchorX="center" letterSpacing={0.22} outlineWidth={0.005} outlineColor="#080b10" fillOpacity={catInScope ? 0.8 : 0.1}>
+            <Text font={displayFont} fontSize={0.082} color={c.color} anchorX="center" letterSpacing={0.22} outlineWidth={0.005} outlineColor="#080b10" fillOpacity={catInScope ? 0.8 : 0.1}>
               {c.label.toUpperCase()}
             </Text>
           </Billboard>
