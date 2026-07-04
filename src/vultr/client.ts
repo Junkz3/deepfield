@@ -154,20 +154,25 @@ export class VultrDriver implements ModelDriver {
   }
 
   async diagnose(q: { device: string; symptom: string }, evidence: Page[], techPhoto?: string): Promise<Diagnosis> {
-    const parts: unknown[] = [{ type: 'text', text: `You are a repair diagnosis agent. Device: ${q.device}. Symptom: ${q.symptom}.\nGround yourself ONLY in the attached manual pages${techPhoto ? ' and the technician photo (last image)' : ''}. Return STRICT JSON: {"component": string, "cause": string, "checks": [string, string, string], "instruction": string, "componentKey": "heater"|"thermistor"|"sensor"|"pump"|"motor"|"board"|"wiring"|"other"} - checks must be concrete ACTIONS the technician performs (measure X, inspect Y), ordered, with measurable values when the pages give them; instruction = one or two sentences guiding the technician: the FIRST concrete action with its expected measurable value from the pages, then what the result decides next; varied phrasing, no boilerplate prefix. Write component/cause/checks in ${AGENT_LANG}; keep part numbers and error codes verbatim. If the pages do not support a diagnosis, set component to "insufficient evidence". Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.` }];
+    const parts: unknown[] = [{ type: 'text', text: `You are a repair diagnosis agent. Device: ${q.device}. Symptom: ${q.symptom}.\nGround yourself ONLY in the attached manual pages${techPhoto ? ' and the technician photo (last image)' : ''}. Return STRICT JSON: {"component": string, "cause": string, "checks": [string, string, string], "instruction": string, "componentKey": "heater"|"thermistor"|"sensor"|"pump"|"motor"|"board"|"wiring"|"other"} - checks must be concrete ACTIONS the technician performs (measure X, inspect Y), ordered, with measurable values when the pages give them; instruction = one or two sentences guiding the technician: the FIRST concrete action with its expected measurable value from the pages, then what the result decides next; varied phrasing, no boilerplate prefix. Write component/cause/checks in ${AGENT_LANG}; keep part numbers and error codes verbatim. If a page gives a STEP-BY-STEP troubleshooting procedure with several candidate causes for this exact malfunction, that IS a valid diagnosis: component = the target of the procedure's first step, cause = the malfunction line as printed, checks = the procedure's first steps in their printed order (cite the paragraph numbers). Only set component to "insufficient evidence" when no retained page addresses the symptom at all. Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.` }];
     for (const p of evidence.slice(0, 4)) parts.push({ type: 'image_url', image_url: { url: await toDataUrl(p.imageUrl) } });
-    if (techPhoto) parts.push({ type: 'image_url', image_url: { url: techPhoto } });
     const fallback: Diagnosis = {
       component: 'insufficient evidence',
       cause: 'The retrieved pages did not yield a grounded diagnosis.',
       checks: ['Describe the symptom more specifically', 'Open the cited pages and check them manually'],
     };
-    const text = await chatText(this.t, MODELS.omni, parts, 8000);
-    const first = extractJson<Diagnosis>(text, fallback);
-    if (first !== fallback) return first;
-    // One silent retry: dense or off-topic pages sometimes burn the budget.
-    const retry = await chatText(this.t, MODELS.omni, parts, 8000);
-    return extractJson<Diagnosis>(retry, fallback);
+    // Degressive escalation: hidden reasoning grows with DENSE page count and
+    // can burn the whole ~4000-token server cap before any JSON comes out
+    // (three military-TM pages: 4000 tokens, zero content; one page: 7s,
+    // perfect grounded answer). Fewer pages beats an identical retry.
+    for (const take of [4, 2, 1]) {
+      const attempt = [parts[0], ...parts.slice(1, 1 + Math.min(take, evidence.length))];
+      if (techPhoto) attempt.push({ type: 'image_url', image_url: { url: techPhoto } });
+      const text = await chatText(this.t, MODELS.omni, attempt, 8000);
+      const d = extractJson<Diagnosis>(text, fallback);
+      if (d !== fallback) return d;
+    }
+    return fallback;
   }
 
   async classify(input: ClassifyInput): Promise<DocMeta> {
