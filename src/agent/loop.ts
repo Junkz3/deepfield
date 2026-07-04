@@ -63,13 +63,24 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   const videoIntent = userInput === 'find-video' || /video|walkthrough/i.test(userInput ?? '');
   let retrieved: ScoredPage[] = [];
   let evidenceIncomplete = false;
+  let keyPages: number[] = [];
   let query = plan.queries[0] ?? `${conversation.device} ${conversation.symptom}`;
   for (let round = 0; round < 3; round++) {
     yield emit({ phase: 'retrieve', summary: `Searching the knowledge base: "${query}"` });
     // Later rounds search what is NOT already retained: each round discovers.
     const pool = round === 0 ? candidates
       : candidates.filter((p) => !retrieved.some((r) => r.page.docId === p.docId && r.page.page === p.page));
-    const results = await driver.retrieve(query, pool);
+    let results: ScoredPage[];
+    try {
+      results = await driver.retrieve(query, pool);
+    } catch (err) {
+      // A transient rerank 500 must not kill the step. With pages already
+      // retained, reason over those; with nothing yet, one retry then give up.
+      if (retrieved.length > 0) break;
+      yield emit({ phase: 'retrieve', summary: 'Retrieval hiccup - retrying' });
+      await new Promise((r) => setTimeout(r, 2000));
+      results = await driver.retrieve(query, pool);
+    }
     // Dynamic top = union of the classic top-3 and anything within 85% of
     // the best score, capped at 5. Never LESS context than a fixed top-3
     // (an 85%-only filter starved the diagnosis when the best score was
@@ -94,6 +105,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     // the evidence, kinds alone do not.)
     const verdict = await driver.assessSufficiency(q, retrieved);
     evidenceIncomplete = !verdict.sufficient;
+    if (verdict.keyPages?.length) keyPages = verdict.keyPages;
     if (verdict.sufficient || !verdict.followupQuery) break;
     yield emit({ phase: 'retrieve', summary: 'Evidence insufficient - retrieving again', detail: verdict.reason });
     query = verdict.followupQuery;
@@ -138,9 +150,25 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     const questionText = deepDive
       ? `Explain in depth: ${conversation.symptom} (device: ${conversation.device})`
       : (userInput && !/^(report-measurement:|find-video$|order-part:|show-citation:|compile-work-order$|open-ingest$|explain-deep$)/.test(userInput) ? userInput : `${conversation.device}: ${conversation.symptom}`);
-    const bestFirst = [...retrieved].sort((a, b) => b.score - a.score);
+    // Scores accumulated across rounds come from DIFFERENT queries (the
+    // assess followups), so they are not comparable: a specs page can outrank
+    // the page holding the actual value. Worse, similarity ranks covers and
+    // TOC pages above value tables (they list every keyword). The sufficiency
+    // judge READ the evidence listing: the pages it named come first. Only
+    // when it named none, fall back to a re-rank against the real question.
+    let bestFirst = [...retrieved].sort((a, b) => b.score - a.score);
+    if (keyPages.length > 0) {
+      const isKey = (r: ScoredPage) => keyPages.includes(r.page.page);
+      bestFirst = [...bestFirst.filter(isKey), ...bestFirst.filter((r) => !isKey(r))];
+    } else if (retrieved.length > 4) {
+      yield emit({ phase: 'reason', summary: 'Focusing the retained pages on the question' });
+      try {
+        const rescored = await driver.retrieve(questionText, retrieved.map((r) => r.page));
+        if (rescored.length > 0) bestFirst = rescored;
+      } catch { /* keep the cross-round order */ }
+    }
     const text = await driver.answer(questionText, bestFirst.map((r) => r.page), deepDive ? 'deep' : 'qa');
-    const citations = retrieved.map(toCitation);
+    const citations = bestFirst.map(toCitation);
     const distinct = Math.max(new Set(retrieved.map((r) => r.page.docId)).size, new Set(retrieved.map((r) => r.page.kind)).size);
     const conf = computeConfidence({ exactCodeMatch: false, corroboratingCitations: distinct - 1, requiredPageMissing: evidenceIncomplete });
     yield emit({ phase: 'decide', summary: 'Answer grounded in the cited pages' });
@@ -157,9 +185,14 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     };
   }
 
-  // REASON (multimodal)
+  // REASON (multimodal). diagnose reads the first 4 pages only: the ones the
+  // sufficiency judge named come first (same rule as answer), accumulation
+  // order for the rest.
   yield emit({ phase: 'reason', summary: 'Reading the retrieved pages' + (conversation.attachments.length > 0 ? ' and your photo' : '') });
-  const diagnosis = await driver.diagnose(q, retrieved.map((r) => r.page), conversation.attachments[0]?.dataUrl);
+  const evidenceOrder = keyPages.length > 0
+    ? [...retrieved.filter((r) => keyPages.includes(r.page.page)), ...retrieved.filter((r) => !keyPages.includes(r.page.page))]
+    : retrieved;
+  const diagnosis = await driver.diagnose(q, evidenceOrder.map((r) => r.page), conversation.attachments[0]?.dataUrl);
   yield emit({ phase: 'reason', summary: `Likely fault: ${diagnosis.component}`, detail: diagnosis.cause });
 
   // The model refusing to invent IS a feature: when the pages truly do not

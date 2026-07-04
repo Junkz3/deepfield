@@ -92,9 +92,12 @@ export class VultrDriver implements ModelDriver {
 Attached pages, in this order: ${pageList}.
 ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque values EXACTLY as printed; cite pages by their REAL numbers from the list above, like (${shown[0] ? `p.${shown[0].page}` : 'p.12'}), after each fact. If the pages do not contain the answer, say exactly what is missing. Keep any internal reasoning under 60 words, then write the answer.` }];
     for (const p of shown) parts.push({ type: 'image_url', image_url: { url: await toDataUrl(p.imageUrl) } });
-    // Degressive like diagnose: dense pages can burn the reasoning cap.
-    for (const take of [4, 2, 1]) {
-      const attempt = [parts[0], ...parts.slice(1, 1 + take)];
+    // Same two-regime retry as diagnose: brevity directive first (rumination
+    // burns the cap on sparse evidence), then shed pages (density burns it).
+    for (const [i, take] of [4, 4, 2, 1].entries()) {
+      const head = i === 0 ? parts[0]
+        : { type: 'text', text: `YOUR PREVIOUS ATTEMPT WAS CUT BY THE TOKEN CAP BEFORE ANY OUTPUT. Do NOT deliberate: at most 20 words of internal reasoning, then write the answer immediately.\n${(parts[0] as { text: string }).text}` };
+      const attempt = [head, ...parts.slice(1, 1 + take)];
       const text = (await chatText(this.t, MODELS.omni, attempt, 8000)).trim();
       if (text) return text;
     }
@@ -176,9 +179,10 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
       `p.${f.page.page} [${f.page.kind}]${f.page.title ? ` "${f.page.title}"` : ''} score=${f.score.toFixed(1)}${f.page.text ? `\n  text: "${f.page.text.slice(0, 400).replace(/\n+/g, ' ')}"` : ''}`,
     ).join('\n');
     const text = await chatText(this.t, MODELS.omni,
-      `You are ${workflowProfile().agentRole}. Task: ${q.device} - ${q.symptom}. Evidence retained so far:\n${listing}\nIMPORTANT: retrieval scored the page IMAGES; a page holds more than its text snippet. A page tagged [error-table] almost certainly contains the full error-code table even if the snippet cuts off before the code; a page tagged [schematic] IS a wiring/schematic page. ${this.scopeHasSchematic ? 'To point at a component you need BOTH the fault identification AND a wiring/schematic page.' : 'The scope contains NO schematic pages at all (user-guide material): a troubleshooting or diagnostic-procedure page is then SUFFICIENT - never demand a wiring diagram that does not exist here.'} This is a quick check, not analysis: keep any internal reasoning under 30 words. Return STRICT JSON: {"sufficient": boolean, "reason": string, "followupQuery": string|null} - reason written in ${AGENT_LANG}; followupQuery = 3-8 plain English search KEYWORDS (e.g. "heating circuit wiring diagram"), NEVER a sentence or an instruction.`, 8000);
-    const v = extractJson(text, { sufficient: true, reason: 'assessment unavailable', followupQuery: null as string | null });
-    return { sufficient: v.sufficient, reason: v.reason, followupQuery: v.followupQuery ?? undefined };
+      `You are ${workflowProfile().agentRole}. Task: ${q.device} - ${q.symptom}. Evidence retained so far:\n${listing}\nIMPORTANT: retrieval scored the page IMAGES; a page holds more than its text snippet. A page tagged [error-table] almost certainly contains the full error-code table even if the snippet cuts off before the code; a page tagged [schematic] IS a wiring/schematic page. ${this.scopeHasSchematic ? 'To point at a component you need BOTH the fault identification AND a wiring/schematic page.' : 'The scope contains NO schematic pages at all (user-guide material): a troubleshooting or diagnostic-procedure page is then SUFFICIENT - never demand a wiring diagram that does not exist here.'} This is a quick check, not analysis: keep any internal reasoning under 30 words. Return STRICT JSON: {"sufficient": boolean, "reason": string, "followupQuery": string|null, "keyPages": [int]} - reason written in ${AGENT_LANG}; followupQuery = 3-8 plain English search KEYWORDS (e.g. "heating circuit wiring diagram"), NEVER a sentence or an instruction; keyPages = the page NUMBERS from the listing above most likely to hold the literal answer (value tables, procedures, fault tables) - EXCLUDE covers, tables of contents and spec summaries.`, 8000);
+    const v = extractJson(text, { sufficient: true, reason: 'assessment unavailable', followupQuery: null as string | null, keyPages: [] as number[] });
+    const keyPages = Array.isArray(v.keyPages) ? v.keyPages.map(Number).filter(Number.isFinite) : [];
+    return { sufficient: v.sufficient, reason: v.reason, followupQuery: v.followupQuery ?? undefined, keyPages: keyPages.length > 0 ? keyPages : undefined };
   }
 
   async diagnose(q: { device: string; symptom: string }, evidence: Page[], techPhoto?: string): Promise<Diagnosis> {
@@ -189,12 +193,16 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
       cause: 'The retrieved pages did not yield a grounded diagnosis.',
       checks: ['Describe the symptom more specifically', 'Open the cited pages and check them manually'],
     };
-    // Degressive escalation: hidden reasoning grows with DENSE page count and
-    // can burn the whole ~4000-token server cap before any JSON comes out
-    // (three military-TM pages: 4000 tokens, zero content; one page: 7s,
-    // perfect grounded answer). Fewer pages beats an identical retry.
-    for (const take of [4, 2, 1]) {
-      const attempt = [parts[0], ...parts.slice(1, 1 + Math.min(take, evidence.length))];
+    // Two failure regimes burn the ~4000-token server cap before any JSON:
+    // DENSE pages (three military-TM pages: cap burned, zero content; one
+    // page: 7s, perfect) and RUMINATION on sparse evidence (measured: the
+    // SAME sewing case answers in 16s with 4 pages, burns the cap with 1-2 -
+    // less context means MORE deliberation). So retry first with a hard
+    // brevity directive at full context, then shed pages for density.
+    for (const [i, take] of [4, 4, 2, 1].entries()) {
+      const head = i === 0 ? parts[0]
+        : { type: 'text', text: `YOUR PREVIOUS ATTEMPT WAS CUT BY THE TOKEN CAP BEFORE ANY OUTPUT. Do NOT deliberate: at most 20 words of internal reasoning, then the JSON object immediately.\n${(parts[0] as { text: string }).text}` };
+      const attempt = [head, ...parts.slice(1, 1 + Math.min(take, evidence.length))];
       if (techPhoto) attempt.push({ type: 'image_url', image_url: { url: techPhoto } });
       const text = await chatText(this.t, MODELS.omni, attempt, 8000);
       const d = extractJson<Diagnosis>(text, fallback);

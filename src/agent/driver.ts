@@ -3,7 +3,14 @@ import { E3_DIAGNOSIS, E3_FLIPPED_DIAGNOSIS, E3_PLAN, E3_SUFFICIENCY } from './f
 
 export interface ClassifyInput { filename: string; pageImages: string[]; pageTexts: (string | undefined)[] }
 export interface DocMeta { category: string; brand: string; model: string; docType: DocType; pageKinds: PageKind[] }
-export interface SufficiencyVerdict { sufficient: boolean; reason: string; followupQuery?: string }
+export interface SufficiencyVerdict {
+  sufficient: boolean;
+  reason: string;
+  followupQuery?: string;
+  /** Pages the judge names as holding the actual answer. Similarity scores
+   *  rank covers and TOC pages above value tables; the judge READS. */
+  keyPages?: number[];
+}
 
 export interface ModelDriver {
   plan(q: { device: string; symptom: string; hasPhoto: boolean; userInput?: string }): Promise<PlanAction>;
