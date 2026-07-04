@@ -32,7 +32,7 @@ taxonomy scope plus a lexical prefilter; stage 2 lets VultronRetriever score the
 images against the query. Scanned schematics and fold-outs rank correctly because the pages are
 seen, not text-extracted.
 
-## Beyond repair: the Deepfield engine
+## <img src="public/favicon.svg" width="26" height="26" alt=""> Beyond repair: the Deepfield engine
 
 Nothing in the engine is repair-specific. Visual retrieval over page images, automatic
 taxonomy, the navigable 3D universe and page-exact citations work on any document corpus.
