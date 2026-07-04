@@ -1,5 +1,9 @@
 import type { Diagnosis, DocType, Page, PageKind, PlanAction, ScoredPage } from './types';
 import { E3_DIAGNOSIS, E3_FLIPPED_DIAGNOSIS, E3_PLAN, E3_SUFFICIENCY } from './fixtures/e3-case';
+import type { AgentSpec } from './workflow';
+import { activeAgents } from './workflow';
+import type { TeamCalibrationInput } from './team';
+import { heuristicTeam } from './team';
 
 export interface ClassifyInput { filename: string; pageImages: string[]; pageTexts: (string | undefined)[] }
 export interface DocMeta { category: string; brand: string; model: string; docType: DocType; pageKinds: PageKind[] }
@@ -21,6 +25,9 @@ export interface ModelDriver {
   /** Free-form grounded answer (questions and deep dives) - optional; the
    *  loop falls back to the diagnosis pipeline when a driver lacks it. */
   answer?(question: string, evidence: Page[], mode: 'qa' | 'deep'): Promise<string>;
+  /** Team calibration: design 1-3 specialized agents for the corpus and the
+   *  user's intent - optional; callers fall back to the heuristic team. */
+  calibrateTeam?(input: TeamCalibrationInput): Promise<AgentSpec[]>;
   /** Tag freshly ingested pages with retrieval-boosting kinds (error-table,
    *  coverage-table, ...) from their text - optional, batched, background. */
   tagPages?(pages: { page: number; text?: string }[]): Promise<Record<number, PageKind>>;
@@ -48,6 +55,18 @@ export class FakeDriver implements ModelDriver {
     }
     if (q.userInput === 'find-video') {
       return { goal: 'Find a visual walkthrough for the heating element replacement', queries: ['heating element replacement walkthrough'] };
+    }
+    // Team routing, offline flavor: word overlap between the request and
+    // each agent's charter. Deterministic, so the loop tests can assert it.
+    const team = activeAgents();
+    if (team.length > 1) {
+      const hay = `${q.symptom} ${q.userInput ?? ''}`.toLowerCase();
+      const scored = team.map((a) => ({
+        a,
+        s: `${a.charter} ${a.label}`.toLowerCase().split(/\W+/).filter((w) => w.length > 3 && hay.includes(w)).length,
+      }));
+      scored.sort((x, y) => y.s - x.s);
+      return { ...E3_PLAN, agentId: scored[0].a.id };
     }
     return E3_PLAN;
   }
@@ -92,6 +111,11 @@ export class FakeDriver implements ModelDriver {
     }
     const flipped = evidence.length === 0; // loop passes [] after an in-spec measurement pivot
     return flipped ? E3_FLIPPED_DIAGNOSIS : E3_DIAGNOSIS;
+  }
+
+  async calibrateTeam(input: TeamCalibrationInput): Promise<AgentSpec[]> {
+    await this.pace('assessSufficiency');
+    return heuristicTeam(input);
   }
 
   async generateProbe(page: { page: number; text: string }): Promise<{ question: string; mustContain: string[] } | null> {

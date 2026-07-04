@@ -3,7 +3,7 @@ import type { ModelDriver } from './driver';
 import { candidatePages, pageTitle } from './taxonomy';
 import { checkMeasurement, checkSafety, getPart } from './tools';
 import { computeConfidence, workOrderConfidence } from './confidence';
-import { workflowProfile } from './workflow';
+import { activeAgents, setWorkflowProfile, workflowProfile } from './workflow';
 
 export interface StepInput { conversation: Conversation; docs: Document[]; userInput?: string }
 
@@ -30,6 +30,21 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   const plan = await driver.plan({ ...q, hasPhoto: conversation.attachments.length > 0, userInput });
   yield emit({ phase: 'plan', summary: plan.goal });
 
+  // ROUTE: with a team of active agents, the plan named the specialist for
+  // THIS request (same call, no extra inference). Its profile drives every
+  // downstream phase of the step - retrieval hints, decision mold, tools.
+  const team = activeAgents();
+  let agentLabel: string | undefined;
+  if (team.length > 0) {
+    const routed = team.length > 1
+      ? team.find((a) => a.id.toLowerCase() === plan.agentId?.toLowerCase())
+      : undefined;
+    const chosen = routed ?? team[0];
+    setWorkflowProfile(chosen.profile);
+    agentLabel = chosen.label;
+    if (team.length > 1) yield emit({ phase: 'plan', summary: `Routed to ${chosen.label}` });
+  }
+
   // Measurement pivot path: tool call decides, then re-diagnose
   if (userInput?.startsWith('report-measurement:')) {
     const [, component, value] = userInput.split(':');
@@ -45,7 +60,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
       yield emit({ phase: 'decide', summary: `Next: test the ${verdict.suggestedComponent}` });
       const conf = computeConfidence({ exactCodeMatch: true, corroboratingCitations: 1, requiredPageMissing: false });
       return {
-        index: conversation.steps.length, phaseEvents: events,
+        index: conversation.steps.length, phaseEvents: events, agentLabel,
         instruction: diagnosis.instruction ? `${verdict.verdict} ${diagnosis.instruction}` : `${verdict.verdict} Now test the ${verdict.suggestedComponent}: ${diagnosis.checks[0]}`,
         citations: [], proposedNext: [
           { label: `Order ${part.name} (${part.ref})`, action: `order-part:${part.ref}` },
@@ -119,7 +134,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     const conf = computeConfidence({ exactCodeMatch: false, corroboratingCitations: citations.length - 1, requiredPageMissing: false });
     yield emit({ phase: 'decide', summary: `Video walkthrough: ${videoHits.length} segment(s) at their exact seconds` });
     return {
-      index: conversation.steps.length, phaseEvents: events,
+      index: conversation.steps.length, phaseEvents: events, agentLabel,
       instruction: `Video walkthrough found. ${videoHits.length} step(s) cited at their exact timestamps - click a segment to play it at the right second.`,
       citations,
       proposedNext: [
@@ -134,7 +149,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     const conf = computeConfidence({ exactCodeMatch: false, corroboratingCitations: 0, requiredPageMissing: true });
     yield emit({ phase: 'decide', summary: 'Cannot proceed without grounded evidence' });
     return {
-      index: conversation.steps.length, phaseEvents: events,
+      index: conversation.steps.length, phaseEvents: events, agentLabel,
       instruction: `No relevant pages for "${conversation.device}" in the knowledge base. Upload its manual, or I can only offer generic guidance.`,
       citations: [], proposedNext: [{ label: 'Upload a manual', action: 'open-ingest' }],
       confidence: conf.value, confidenceReason: conf.reason, status: 'no-evidence',
@@ -173,7 +188,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     const conf = computeConfidence({ exactCodeMatch: false, corroboratingCitations: distinct - 1, requiredPageMissing: evidenceIncomplete });
     yield emit({ phase: 'decide', summary: 'Answer grounded in the cited pages' });
     return {
-      index: conversation.steps.length, phaseEvents: events,
+      index: conversation.steps.length, phaseEvents: events, agentLabel,
       instruction: text.split('\n')[0].slice(0, 200),
       answer: text,
       citations,
@@ -202,7 +217,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     const conf = computeConfidence({ exactCodeMatch: false, corroboratingCitations: 0, requiredPageMissing: true });
     yield emit({ phase: 'decide', summary: 'The retrieved pages do not support a grounded diagnosis' });
     return {
-      index: conversation.steps.length, phaseEvents: events,
+      index: conversation.steps.length, phaseEvents: events, agentLabel,
       instruction: `The pages found (see citations) reference procedures that are not in the knowledge base yet. Upload the full service manual for "${conversation.device}", or open the cited index pages to locate the paper procedure.`,
       citations: retrieved.map(toCitation),
       proposedNext: [{ label: 'Upload the full manual', action: 'open-ingest' }],
@@ -283,7 +298,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   proposedNext.push({ label: 'Compile work order', action: 'compile-work-order' });
 
   return {
-    index: conversation.steps.length, phaseEvents: events,
+    index: conversation.steps.length, phaseEvents: events, agentLabel,
     instruction: diagnosis.instruction ?? `${diagnosis.cause} First: ${diagnosis.checks[0]}.`,
     citations,
     proposedNext: proposedNext.slice(0, 5),

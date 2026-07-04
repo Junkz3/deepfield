@@ -1,6 +1,10 @@
 import type { ClassifyInput, DocMeta, ModelDriver, SufficiencyVerdict } from '../agent/driver';
 import type { Diagnosis, Page, PageKind, PlanAction, ScoredPage } from '../agent/types';
 import { workflowProfile } from '../agent/workflow';
+import type { AgentSpec } from '../agent/workflow';
+import { activeAgents } from '../agent/workflow';
+import type { TeamCalibrationInput } from '../agent/team';
+import { heuristicTeam, parseTeam, teamPrompt } from '../agent/team';
 
 export type Transport = (path: string, body: unknown) => Promise<any>;
 
@@ -77,8 +81,21 @@ export class VultrDriver implements ModelDriver {
     const userInput = q.userInput === 'find-video'
       ? 'Show the video walkthrough for this repair. Phrase the retrieval query as: video walkthrough <device> <faulty component> replacement.'
       : q.userInput;
+    // Multi-agent routing lives INSIDE the plan call: with several active
+    // agents the same prompt gains a roster and returns "agentId" - zero
+    // extra inference calls, and byte-identical prompt with a solo team.
+    const team = activeAgents();
+    const routed = team.length > 1;
+    const role = routed ? 'the dispatcher of a team of specialized agents' : workflowProfile().agentRole;
+    const roster = routed
+      ? `\nRoute this request to exactly ONE team agent:\n${team.map((a) => `- agentId "${a.id}" (${a.profile.agentRole}): handles ${a.charter}; evidence focus: ${a.profile.retrievalHint}`).join('\n')}`
+      : '';
+    const jsonShape = routed
+      ? '{"goal": string, "queries": [string], "intent": "diagnose"|"question", "agentId": string (the routed agent)}'
+      : '{"goal": string, "queries": [string], "intent": "diagnose"|"question"}';
+    const hint = routed ? "follow the routed agent's evidence focus" : workflowProfile().retrievalHint;
     const text = await chatText(this.t, MODELS.omni,
-      `You are ${workflowProfile().agentRole} planning evidence retrieval from a knowledge base that holds PAGINATED DOCUMENT PAGES and TIMESTAMPED VIDEO WALKTHROUGH SEGMENTS.\n${workflowProfile().subjectNoun}: ${q.device}\n${workflowProfile().issueNoun}: ${q.symptom}\nUser input: ${userInput ?? 'none'}\nThis is quick planning, not analysis: keep any internal reasoning under 30 words. Return STRICT JSON: {"goal": string, "queries": [string], "intent": "diagnose"|"question"} - intent is "diagnose" for faults/symptoms to troubleshoot, "question" for how-to, maintenance, specs or informational asks; one focused retrieval query (${workflowProfile().retrievalHint}; start the query with "video walkthrough" when the user wants a demonstration). The retrieval query MUST be written in English (the corpus language) regardless of the user's language; write the goal in ${AGENT_LANG}.`, 8000);
+      `You are ${role} planning evidence retrieval from a knowledge base that holds PAGINATED DOCUMENT PAGES and TIMESTAMPED VIDEO WALKTHROUGH SEGMENTS.\n${workflowProfile().subjectNoun}: ${q.device}\n${workflowProfile().issueNoun}: ${q.symptom}\nUser input: ${userInput ?? 'none'}${roster}\nThis is quick planning, not analysis: keep any internal reasoning under 30 words. Return STRICT JSON: ${jsonShape} - intent is "diagnose" for faults/symptoms to troubleshoot, "question" for how-to, maintenance, specs or informational asks; one focused retrieval query (${hint}; start the query with "video walkthrough" when the user wants a demonstration). The retrieval query MUST be written in English (the corpus language) regardless of the user's language; write the goal in ${AGENT_LANG}.`, 8000);
     return extractJson<PlanAction>(text, { goal: `Diagnose ${q.symptom}`, queries: [`${q.device} ${q.symptom}`] });
   }
 
@@ -225,6 +242,13 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
       }
     }
     return null;
+  }
+
+  async calibrateTeam(input: TeamCalibrationInput): Promise<AgentSpec[]> {
+    // Nemotron designs the agent team from the corpus signal and the user's
+    // intent sentence; any parse failure falls back to the keyword heuristic.
+    const text = await chatText(this.t, MODELS.omni, [{ type: 'text', text: teamPrompt(input) }], 8000);
+    return parseTeam(text) ?? heuristicTeam(input);
   }
 
   async tagPages(pages: { page: number; text?: string }[]): Promise<Record<number, PageKind>> {
