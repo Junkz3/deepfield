@@ -61,10 +61,14 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   const candidates = candidatePages(docs, conversation.device);
   const videoIntent = userInput === 'find-video' || /video|walkthrough/i.test(userInput ?? '');
   let retrieved: ScoredPage[] = [];
+  let evidenceIncomplete = false;
   let query = plan.queries[0] ?? `${conversation.device} ${conversation.symptom}`;
   for (let round = 0; round < 3; round++) {
     yield emit({ phase: 'retrieve', summary: `Searching the knowledge base: "${query}"` });
-    const results = await driver.retrieve(query, candidates);
+    // Later rounds search what is NOT already retained: each round discovers.
+    const pool = round === 0 ? candidates
+      : candidates.filter((p) => !retrieved.some((r) => r.page.docId === p.docId && r.page.page === p.page));
+    const results = await driver.retrieve(query, pool);
     const top = results.filter((r) => r.score >= 1.5).slice(0, 3);
     yield emit({
       phase: 'retrieve',
@@ -76,6 +80,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     if (retrieved.length === 0) break;
     if (videoIntent && retrieved.some((r) => r.page.kind === 'video-segment')) break; // media step: no depth needed
     const verdict = await driver.assessSufficiency(q, retrieved);
+    evidenceIncomplete = !verdict.sufficient;
     if (verdict.sufficient || !verdict.followupQuery) break;
     yield emit({ phase: 'retrieve', summary: 'Evidence insufficient - retrieving again', detail: verdict.reason });
     query = verdict.followupQuery;
@@ -118,15 +123,27 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
 
   // TOOLS
   yield emit({ phase: 'tools', summary: 'Checking parts and safety' });
-  const partRef = PART_FOR[diagnosis.component.toLowerCase().includes('heat') ? 'heating element' : 'thermistor'];
-  const part = await getPart(partRef);
+  // Part lookup by machine key; devices without a catalog entry get an honest
+  // OEM-sourcing line instead of a dishwasher part.
+  const compKey = `${diagnosis.componentKey ?? ''} ${diagnosis.component}`.toLowerCase();
+  const partRef = PART_FOR[compKey.trim()] ?? (compKey.includes('heat') ? PART_FOR['heating element'] : compKey.includes('therm') ? PART_FOR['thermistor'] : undefined);
+  const part = partRef
+    ? await getPart(partRef)
+    : { ref: 'OEM', name: `${diagnosis.component} (source via OEM parts catalog)`, inStock: false, leadDays: undefined };
   const safety = await checkSafety(`${conversation.device.toLowerCase().includes('hmmwv') || conversation.device.toLowerCase().includes('vehicle') ? 'vehicle: ' : ''}replace ${diagnosis.component}`);
-  yield emit({ phase: 'tools', summary: `${part.name}: ${part.inStock ? 'in stock' : `lead time ${part.leadDays}d`} - safety notes attached` });
+  yield emit({ phase: 'tools', summary: `${part.name}: ${part.inStock ? 'in stock' : part.leadDays ? `lead time ${part.leadDays}d` : 'order from OEM'} - safety notes attached` });
 
   // DECIDE
   const citations = retrieved.map(toCitation);
-  const exactCodeMatch = /e3|dtc/i.test(conversation.symptom) && retrieved.some((r) => r.page.kind === 'error-table');
-  const conf = computeConfidence({ exactCodeMatch, corroboratingCitations: citations.length - 1, requiredPageMissing: false });
+  // Generic exact-code detection: any code-like token from the symptom
+  // (E3, DTC 21, P0301, F7 E1...) found in a retained page's text or kind.
+  const codes = (conversation.symptom.match(/\b[a-z]{0,4}[-\s]?\d{1,4}\b/gi) ?? [])
+    .map((c) => c.replace(/[-\s]/g, '').toLowerCase())
+    .filter((c) => /\d/.test(c) && c.length >= 2);
+  const exactCodeMatch = codes.length > 0 && retrieved.some((r) =>
+    r.page.kind === 'error-table' ||
+    codes.some((c) => (r.page.text ?? '').replace(/[-\s]/g, '').toLowerCase().includes(c)));
+  const conf = computeConfidence({ exactCodeMatch, corroboratingCitations: citations.length - 1, requiredPageMissing: evidenceIncomplete });
   yield emit({ phase: 'decide', summary: `First check: ${diagnosis.checks[0]}` });
 
   // Proposed actions follow the DIAGNOSIS, not a fixed script. The machine
