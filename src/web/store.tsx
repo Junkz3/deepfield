@@ -151,9 +151,15 @@ export function useApp(): Ctx {
   return ctx;
 }
 
-/** Category accent color — single source for galaxy, tree, badges. */
+/** Category accent color — single source for galaxy, tree, badges.
+ *  Core categories use the design tokens; the long tail gets a deterministic
+ *  generated hue (same hash as the 3D scene). */
 export function categoryColor(category: string): string {
   const key = category.toLowerCase().replace(/\s+/g, '-');
   const known = ['dishwasher', 'washing-machine', 'vehicle', 'smartphone', 'game-console', 'coffee-machine'];
-  return `var(--cat-${known.includes(key) ? key : 'uncategorized'})`;
+  if (known.includes(key)) return `var(--cat-${key})`;
+  const raw = category.toLowerCase();
+  let h = 0;
+  for (let i = 0; i < raw.length; i++) h = (h * 31 + raw.charCodeAt(i)) >>> 0;
+  return `hsl(${h % 360}, ${62 + (h % 3) * 8}%, ${64 + (h % 4) * 4}%)`;
 }

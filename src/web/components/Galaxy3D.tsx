@@ -21,7 +21,14 @@ const CAT_COLORS: Record<string, string> = {
   'game console': '#f07178',
   'coffee machine': '#e6b455',
 };
-const catColor = (label: string) => CAT_COLORS[label.toLowerCase()] ?? '#8b99a8';
+/** Fixed hues for the core categories; deterministic generated hues for the rest. */
+const catColor = (label: string) => {
+  const key = label.toLowerCase();
+  if (CAT_COLORS[key]) return CAT_COLORS[key];
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return `hsl(${h % 360}, ${62 + (h % 3) * 8}%, ${64 + (h % 4) * 4}%)`;
+};
 
 const rnd = (seed: number) => Math.sin(seed * 127.1 + 311.7) * 0.5 + Math.sin(seed * 74.7) * 0.5;
 
@@ -145,6 +152,94 @@ function OrbitRings() {
       <group rotation={[-0.12, 0.5, -0.08]}>
         <Line points={mk(R * 1.52)} color="#232c37" lineWidth={1} transparent opacity={0.25} dashed dashScale={14} />
       </group>
+    </group>
+  );
+}
+
+/* ---------- lightning: neon energy links, plasma-globe style ---------- */
+
+const BOLT_PTS = 22;
+
+function makeBoltLine(color: string, opacity: number): THREE.Line {
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array((BOLT_PTS + 1) * 3), 3));
+  const mat = new THREE.LineBasicMaterial({
+    color, transparent: true, opacity,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  const line = new THREE.Line(geom, mat);
+  line.frustumCulled = false;
+  return line;
+}
+
+/** One crackling bolt from the core to a target. Three superimposed jittered
+ *  passes (white core, colored sheath, wide halo) regenerate ~14x/s. */
+function LightningBolt({ to, color, interval = 0.07 }: { to: THREE.Vector3; color: string; interval?: number }) {
+  const lines = useMemo(
+    () => [makeBoltLine('#ffffff', 0.95), makeBoltLine(color, 0.55), makeBoltLine(color, 0.22)],
+    [color],
+  );
+  useEffect(() => () => lines.forEach((l) => { l.geometry.dispose(); (l.material as THREE.Material).dispose(); }), [lines]);
+  const acc = useRef(1); // draw immediately on mount
+
+  useFrame((_, dt) => {
+    acc.current += dt;
+    if (acc.current < interval) return;
+    acc.current = 0;
+    const len = to.length();
+    const dir = to.clone().normalize();
+    const p1 = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0));
+    if (p1.lengthSq() < 1e-4) p1.set(1, 0, 0);
+    p1.normalize();
+    const p2 = new THREE.Vector3().crossVectors(dir, p1);
+    const spread = [0.035, 0.06, 0.1];
+    lines.forEach((line, li) => {
+      const pos = line.geometry.getAttribute('position') as THREE.BufferAttribute;
+      for (let i = 0; i <= BOLT_PTS; i++) {
+        const t = i / BOLT_PTS;
+        const env = Math.sin(t * Math.PI) * len * spread[li];
+        const a = (Math.random() - 0.5) * 2 * env;
+        const b = (Math.random() - 0.5) * 2 * env;
+        pos.setXYZ(i,
+          to.x * t + p1.x * a + p2.x * b,
+          to.y * t + p1.y * a + p2.y * b,
+          to.z * t + p1.z * a + p2.z * b);
+      }
+      pos.needsUpdate = true;
+    });
+  });
+
+  return <group>{lines.map((l, i) => <primitive key={i} object={l} />)}</group>;
+}
+
+/** While the agent scans, 4-5 bolts probe random in-scope files, retargeting
+ *  fast — the plasma globe reaching for fingers. */
+function ScanStorm({ targets }: { targets: { pos: THREE.Vector3; color: string }[] }) {
+  const SLOTS = Math.min(5, Math.max(2, targets.length));
+  const [picks, setPicks] = useState<number[]>([]);
+  const swapAt = useRef<number[]>([]);
+
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    let changed = false;
+    const next = [...picks];
+    for (let sIdx = 0; sIdx < SLOTS; sIdx++) {
+      if (swapAt.current[sIdx] === undefined || t >= swapAt.current[sIdx]) {
+        next[sIdx] = Math.floor(Math.random() * targets.length);
+        swapAt.current[sIdx] = t + 0.16 + Math.random() * 0.28;
+        changed = true;
+      }
+    }
+    if (changed) setPicks(next);
+  });
+
+  if (targets.length === 0) return null;
+  return (
+    <group>
+      {picks.slice(0, SLOTS).map((pi, sIdx) => {
+        const tgt = targets[pi];
+        return tgt ? <LightningBolt key={sIdx} to={tgt.pos} color={tgt.color} interval={0.055} /> : null;
+      })}
     </group>
   );
 }
@@ -493,10 +588,15 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
 
   const { nodes, catAnchors } = useMemo(() => {
     const categories = [...new Set(docs.map((d) => d.category))].sort();
+    // Fibonacci sphere: any number of categories spreads evenly over the shell
+    // (band-limited so labels never sit at the poles).
+    const GOLDEN = Math.PI * (3 - Math.sqrt(5));
     const anchors = categories.map((label, i) => {
-      const a = (i / Math.max(categories.length, 1)) * Math.PI * 2;
-      const y = 0.34 * (i % 2 === 0 ? 1 : -1);
-      return { label, dir: new THREE.Vector3(Math.cos(a), y, Math.sin(a)).normalize(), color: catColor(label) };
+      const n = Math.max(categories.length, 1);
+      const y = n === 1 ? 0 : (1 - (i / (n - 1)) * 2) * 0.72; // clamp away from poles
+      const rad = Math.sqrt(Math.max(0, 1 - y * y));
+      const a = i * GOLDEN;
+      return { label, dir: new THREE.Vector3(Math.cos(a) * rad, y, Math.sin(a) * rad).normalize(), color: catColor(label) };
     });
     const out: FileNode[] = [];
     for (const doc of docs) {
@@ -573,17 +673,7 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
 
       {nodes.map((n) => (
         <group key={n.doc.id}>
-          {hitByDoc.has(n.doc.id) && (
-            <Line
-              points={[[0, 0, 0], livePos(n).toArray()]}
-              color={n.color}
-              lineWidth={2.5}
-              dashed
-              dashScale={6}
-              transparent
-              opacity={0.9}
-            />
-          )}
+          {hitByDoc.has(n.doc.id) && <LightningBolt to={livePos(n)} color={n.color} />}
           <FileCard
             node={n}
             targetPos={livePos(n)}
@@ -595,6 +685,10 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
           />
         </group>
       ))}
+
+      {state.scanning && (
+        <ScanStorm targets={nodes.filter((n) => inScope(n.doc.id)).map((n) => ({ pos: livePos(n), color: n.color }))} />
+      )}
 
       {focusNode && floatingPages.map((p, i) => (
         <FloatingPage
