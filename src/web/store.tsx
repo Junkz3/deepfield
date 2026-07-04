@@ -107,8 +107,14 @@ export function reducer(state: AppState, a: Action): AppState {
       return { ...state, sessionDocs: mergeDocs(state.sessionDocs, [a.doc]) };
     case 'open-center':
       return { ...state, activeView: { kind: 'center' } };
-    case 'open-conversation':
-      return { ...state, activeView: { kind: 'conversation', id: a.id } };
+    case 'open-conversation': {
+      // Restore the citation fan of the last completed step: the universe
+      // shows where the evidence lives without re-running anything.
+      const conv = state.conversations.find((c) => c.id === a.id);
+      const lastCited = conv ? [...conv.steps].reverse().find((st) => st.citations.length > 0) : undefined;
+      const highlight = lastCited ? lastCited.citations.map((c) => ({ docId: c.docId, page: c.page })) : state.highlight;
+      return { ...state, activeView: { kind: 'conversation', id: a.id }, highlight };
+    }
     case 'new-conversation': {
       const conv: Conversation = {
         id: a.id, device: a.device, symptom: a.symptom,
