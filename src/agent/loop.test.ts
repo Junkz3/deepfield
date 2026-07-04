@@ -49,14 +49,15 @@ describe('runStep - hero E3 first step', () => {
   });
 });
 
-describe('runStep - measurement pivot (tool changes the outcome)', () => {
-  it('flips the hypothesis to thermistor on an in-spec heater reading', async () => {
-    const c = conv();
-    c.steps.push({ index: 0 } as GuidedStep);
-    const { events, step } = await drain(runStep({ conversation: c, docs: [heroDoc], userInput: 'report-measurement:heating element:22' }, drv));
-    expect(events.some((e) => e.phase === 'tools' && e.summary.match(/within spec/i))).toBe(true);
-    expect(step.instruction).toMatch(/thermistor/i);
-    expect(step.proposedNext.some((p) => p.action.includes('WPW10352973') || p.label.match(/thermistor/i))).toBe(true);
+describe('runStep - requested ops execute against the real corpus', () => {
+  it('narrates the agent-requested ops in the timeline', async () => {
+    const { events } = await drain(runStep({ conversation: conv(), docs: [heroDoc] }, drv));
+    // The offline script requests part_lookup + safety_notes in its verdict;
+    // both are generic lookups now - they search the workspace pages.
+    const requested = events.find((e) => e.phase === 'tools' && e.summary.startsWith('Agent requested:'));
+    expect(requested?.summary).toMatch(/parts pages lookup/i);
+    const runs = events.filter((e) => e.phase === 'tools' && /lookup:/i.test(e.summary));
+    expect(runs.length).toBeGreaterThanOrEqual(2);
   });
 });
 

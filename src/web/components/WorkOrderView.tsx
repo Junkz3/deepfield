@@ -13,12 +13,10 @@ function buildMarkdown(wo: WorkOrder): string {
     ``,
     `## Procedure`,
     ...wo.procedure.map((p, i) => `${i + 1}. ${p}`),
-    ``,
-    `## Parts`,
-    ...wo.parts.map((p) => `- ${p.ref} — ${p.name} — ${p.inStock ? `in stock${p.price ? `, $${p.price}` : ''}` : `lead time ${p.leadDays ?? '?'}d`}`),
-    ``,
-    `## Safety`,
-    ...wo.safety.map((s) => `- ${s}`),
+    ...(wo.parts.length > 0
+      ? [``, `## Parts`, ...wo.parts.map((p) => `- ${p.ref} — ${p.name} — ${p.inStock ? `in stock${p.price ? `, $${p.price}` : ''}` : `lead time ${p.leadDays ?? '?'}d`}`)]
+      : []),
+    ...(wo.safety.length > 0 ? [``, `## Safety`, ...wo.safety.map((s) => `- ${s}`)] : []),
     ``,
     `## Citations`,
     ...wo.citations.map((c) => `- ${c.label}${c.quote ? ` — "${c.quote}"` : ''}`),
@@ -75,22 +73,24 @@ export function WorkOrderView({ conversation, docs, onClose }: { conversation: C
             <p className="wo-cause">{wo.diagnosis.cause}</p>
           </div>
 
-          <div className="wo-block">
-            <h3>Parts</h3>
-            <table className="wo-parts">
-              <tbody>
-                {wo.parts.map((p) => (
-                  <tr key={p.ref}>
-                    <td className="mono">{p.ref}</td>
-                    <td>{p.name}</td>
-                    <td className={p.inStock ? 'ok' : 'warn'}>
-                      {p.inStock ? `in stock${p.price ? ` · $${p.price}` : ''}` : `lead ${p.leadDays ?? '?'}d`}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {wo.parts.length > 0 && (
+            <div className="wo-block">
+              <h3>Parts</h3>
+              <table className="wo-parts">
+                <tbody>
+                  {wo.parts.map((p) => (
+                    <tr key={p.ref}>
+                      <td className="mono">{p.ref}</td>
+                      <td>{p.name}</td>
+                      <td className={p.inStock ? 'ok' : 'warn'}>
+                        {p.inStock ? `in stock${p.price ? ` · $${p.price}` : ''}` : `lead ${p.leadDays ?? '?'}d`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <div className="wo-block wide">
             <h3>Procedure</h3>
@@ -101,14 +101,16 @@ export function WorkOrderView({ conversation, docs, onClose }: { conversation: C
             </ol>
           </div>
 
-          <div className="wo-block">
-            <h3>Safety</h3>
-            <ul className="wo-safety">
-              {wo.safety.map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ul>
-          </div>
+          {wo.safety.length > 0 && (
+            <div className="wo-block">
+              <h3>Safety</h3>
+              <ul className="wo-safety">
+                {wo.safety.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="wo-block">
             <h3>Citations</h3>

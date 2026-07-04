@@ -1,56 +1,17 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Page } from './types';
 import {
-  activeTools, checkMeasurement, checkSafety, getPart, installWorkspaceOps,
-  opFromSpec, opsPromptSection, setWorkspaceTools, TOOL_REGISTRY, workspaceOps,
+  activeTools, installWorkspaceOps, opFromSpec, opsPromptSection,
+  setWorkspaceTools, TOOL_REGISTRY, workspaceOps,
 } from './tools';
 
-describe('getPart', () => {
-  it('returns a known part with stock info', async () => {
-    const p = await getPart('W10518394');
-    expect(p).toMatchObject({ ref: 'W10518394', name: 'Heating element', inStock: true });
-  });
-  it('returns a graceful unknown for missing refs', async () => {
-    const p = await getPart('NOPE');
-    expect(p.inStock).toBe(false);
-    expect(p.name).toMatch(/unknown/i);
-  });
-});
-
-describe('checkSafety', () => {
-  it('returns cited safety lines', async () => {
-    const s = await checkSafety('replace heating element');
-    expect(s.lines.length).toBeGreaterThan(0);
-    expect(s.citations[0].label).toBeTruthy();
-  });
-  it('uses vehicle safety set for vehicle operations', async () => {
-    const s = await checkSafety('vehicle: test TCM harness');
-    expect(s.lines[0]).toMatch(/battery/i);
-  });
-});
-
-describe('checkMeasurement (the hypothesis-flip tool)', () => {
-  it('in-spec heater reading flips suspicion to the thermistor', async () => {
-    const v = await checkMeasurement('heating element', 22);
-    expect(v.withinSpec).toBe(true);
-    expect(v.suggestedComponent).toBe('thermistor');
-    expect(v.verdict).toMatch(/within spec/i);
-  });
-  it('out-of-spec heater reading confirms the heater', async () => {
-    const v = await checkMeasurement('heating element', 0);
-    expect(v.withinSpec).toBe(false);
-    expect(v.suggestedComponent).toBeUndefined();
-  });
-  it('unknown component says so honestly', async () => {
-    const v = await checkMeasurement('flux capacitor', 42);
-    expect(v.verdict).toMatch(/no spec/i);
-  });
-});
+const page = (n: number, text: string, title?: string): Page =>
+  ({ docId: 'doc', page: n, imageUrl: `p${n}.png`, text, title, kind: 'other' });
 
 describe('workspace tool registry (the model requests, the loop executes)', () => {
-  afterEach(() => setWorkspaceTools(TOOL_REGISTRY.map((t) => t.id)));
+  afterEach(() => installWorkspaceOps(TOOL_REGISTRY));
 
-  it('exposes the full registry by default and honors the workspace curation', () => {
+  it('exposes the repair preset by default and honors the workspace curation', () => {
     expect(activeTools().map((t) => t.id)).toEqual(['part_lookup', 'safety_notes', 'measurement_check']);
     setWorkspaceTools(['part_lookup']);
     expect(activeTools().map((t) => t.id)).toEqual(['part_lookup']);
@@ -58,34 +19,27 @@ describe('workspace tool registry (the model requests, the loop executes)', () =
     expect(activeTools()).toEqual([]);
   });
 
-  it('part_lookup resolves a known component to a catalog part', async () => {
-    const tool = TOOL_REGISTRY.find((t) => t.id === 'part_lookup')!;
-    const run = await tool.run({ component: 'heating element' }, { device: 'Whirlpool dishwasher', component: 'heater' });
-    expect(run.part?.ref).toBe('W10518394');
-    expect(run.summary).toMatch(/in stock/i);
-  });
-
-  it('part_lookup falls back to an honest OEM line off-catalog', async () => {
-    const tool = TOOL_REGISTRY.find((t) => t.id === 'part_lookup')!;
-    const run = await tool.run({ component: 'fuel solenoid' }, { device: 'generator', component: 'fuel solenoid' });
-    expect(run.part?.ref).toBe('OEM');
-    expect(run.part?.inStock).toBe(false);
-  });
-
-  it('safety_notes picks the vehicle set from the device context', async () => {
-    const tool = TOOL_REGISTRY.find((t) => t.id === 'safety_notes')!;
-    const run = await tool.run({ operation: 'test TCM harness' }, { device: 'HMMWV M1151', component: 'sensor' });
-    expect(run.safety?.lines[0]).toMatch(/battery/i);
+  it('the preset ops are the generic runners - nothing simulated', async () => {
+    // part_lookup searches the real corpus pages for parts material; with no
+    // matching page it says so instead of inventing stock or references.
+    const partLookup = TOOL_REGISTRY.find((t) => t.id === 'part_lookup')!;
+    expect(partLookup.kind).toBe('lookup');
+    const found = await partLookup.run({ component: 'heating element' }, {
+      device: 'Whirlpool dishwasher', component: 'heater',
+      pages: [page(4, 'wash cycle overview'), page(58, 'replacement parts list: heating element W10518394', 'Parts list')],
+    });
+    expect(found.pages?.map((p) => p.page)).toEqual([58]);
+    expect(found.summary).toMatch(/Parts list p\.58/);
+    const nothing = await partLookup.run({ component: 'flux capacitor' }, { device: 'x', component: 'y', pages: [] });
+    expect(nothing.summary).toMatch(/no matching page/i);
+    expect(TOOL_REGISTRY.find((t) => t.id === 'measurement_check')!.kind).toBe('capture');
   });
 });
-
-const page = (n: number, text: string, title?: string): Page =>
-  ({ docId: 'doc', page: n, imageUrl: `p${n}.png`, text, title, kind: 'other' });
 
 describe('calibrated ops (two generic behaviors cover every vertical)', () => {
   afterEach(() => installWorkspaceOps(TOOL_REGISTRY));
 
-  it('the verdict prompt op offer is byte-identical to the shipped sentence', () => {
+  it('the verdict prompt op offer is byte-identical to the tuned sentence', () => {
     // The repair prompt is lace: it took four measured iterations to settle.
     // Locking the exact sentence guarantees generalizing ops moved nothing.
     expect(opsPromptSection(TOOL_REGISTRY)).toBe(
@@ -114,13 +68,6 @@ describe('calibrated ops (two generic behaviors cover every vertical)', () => {
     });
     expect(run.pages?.map((p) => p.page)).toEqual([9]);
     expect(run.summary).toMatch(/Torque chart p\.9/);
-  });
-
-  it('a lookup op says so honestly when nothing matches', async () => {
-    const op = opFromSpec({ id: 'x', label: 'X', kind: 'lookup', cue: 'with args.a when b', query: 'zzz qqq' });
-    const run = await op.run({}, { device: 'd', component: 'c', pages: [page(1, 'unrelated prose')] });
-    expect(run.pages).toEqual([]);
-    expect(run.summary).toMatch(/no matching page/i);
   });
 
   it('a capture op narrates the awaited real-world value', async () => {

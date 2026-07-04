@@ -14,7 +14,6 @@ export interface PlanAction { goal: string; queries: string[]; intent?: 'diagnos
 export interface Diagnosis { component: string; cause: string; checks: string[]; instruction?: string; componentKey?: string; tools?: { id: string; args?: Record<string, string> }[] }
 export interface PartLine { ref: string; name: string; inStock: boolean; price?: number; leadDays?: number }
 export interface SafetyInfo { lines: string[]; citations: Citation[] }
-export interface MeasurementVerdict { withinSpec: boolean; specRange: string; verdict: string; suggestedComponent?: string }
 export interface PhaseEvent { phase: Phase; summary: string; detail?: string; citations?: Citation[]; hitPages?: { docId: string; page: number }[] }
 export interface ProposedAction { label: string; action: string }
 export interface GuidedStep { index: number; phaseEvents: PhaseEvent[]; instruction: string; citations: Citation[]; proposedNext: ProposedAction[]; confidence: number; confidenceReason: string; status: StepStatus; diagnosis?: Diagnosis; parts?: PartLine[]; safety?: SafetyInfo; userInput?: string; answer?: string; agentLabel?: string }

@@ -30,10 +30,6 @@ describe('FakeDriver E3 script', () => {
     const d = await drv.diagnose(q, [E3_PAGES.errorTable, E3_PAGES.wiring]);
     expect(d.component).toMatch(/heating element/i);
   });
-  it('flips to thermistor when the user reports an in-spec heater measurement', async () => {
-    const p = await drv.plan({ ...q, hasPhoto: false, userInput: 'report-measurement:heating element:22' });
-    expect(p.goal).toMatch(/thermistor/i);
-  });
   it('classify returns dishwasher metadata for a whirlpool filename', async () => {
     const m = await drv.classify({ filename: 'whirlpool-service.pdf', pageImages: [], pageTexts: [] });
     expect(m.category).toBe('dishwasher');

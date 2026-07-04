@@ -1,7 +1,6 @@
 import { FakeDriver } from './agent/driver';
 import { runStep, compileWorkOrder } from './agent/loop';
 import { E3_PAGES, HERO_DOC_ID, E3_DIAGNOSIS } from './agent/fixtures/e3-case';
-import { getPart, checkSafety } from './agent/tools';
 import type { Conversation, Document } from './agent/types';
 
 const heroDoc: Document = {
@@ -28,6 +27,6 @@ step.citations.forEach((c) => console.log(`  [cite] ${c.label}${c.quote ? ` - "$
 console.log(`Confidence: ${(step.confidence * 100).toFixed(0)}% (${step.confidenceReason})`);
 step.proposedNext.forEach((p) => console.log(`  -> ${p.label}`));
 
-const wo = compileWorkOrder(conversation, E3_DIAGNOSIS, [await getPart('W10518394')], await checkSafety('replace heater'));
+const wo = compileWorkOrder(conversation, E3_DIAGNOSIS, [], { lines: [], citations: [] });
 console.log('\n=== WORK ORDER ===');
 console.log(JSON.stringify({ ...wo, citations: wo.citations.map((c) => c.label) }, null, 2));

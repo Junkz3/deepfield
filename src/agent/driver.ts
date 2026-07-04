@@ -1,5 +1,5 @@
 import type { Diagnosis, DocType, Page, PageKind, PlanAction, ScoredPage } from './types';
-import { E3_DIAGNOSIS, E3_FLIPPED_DIAGNOSIS, E3_PLAN, E3_SUFFICIENCY } from './fixtures/e3-case';
+import { E3_DIAGNOSIS, E3_PLAN, E3_SUFFICIENCY } from './fixtures/e3-case';
 import { activeAgents } from './workflow';
 import type { TeamCalibration, TeamCalibrationInput } from './team';
 import { heuristicCalibration } from './team';
@@ -49,10 +49,6 @@ export class FakeDriver implements ModelDriver {
 
   async plan(q: { device: string; symptom: string; hasPhoto: boolean; userInput?: string }): Promise<PlanAction> {
     await this.pace('plan');
-    if (q.userInput?.startsWith('report-measurement:')) {
-      const [, component, value] = q.userInput.split(':');
-      return { goal: `Re-evaluate: ${component} measured ${value} ohms - verify against spec, pivot to thermistor if in spec`, queries: [] };
-    }
     if (q.userInput === 'find-video') {
       return { goal: 'Find a visual walkthrough for the heating element replacement', queries: ['heating element replacement walkthrough'] };
     }
@@ -109,17 +105,14 @@ export class FakeDriver implements ModelDriver {
         ],
       };
     }
-    const flipped = evidence.length === 0; // loop passes [] after an in-spec measurement pivot
     // The offline script requests its ops like the live model would.
-    return flipped
-      ? E3_FLIPPED_DIAGNOSIS
-      : {
-        ...E3_DIAGNOSIS,
-        tools: [
-          { id: 'part_lookup', args: { component: 'heating element' } },
-          { id: 'safety_notes', args: { operation: 'replace heating element' } },
-        ],
-      };
+    return {
+      ...E3_DIAGNOSIS,
+      tools: [
+        { id: 'part_lookup', args: { component: 'heating element' } },
+        { id: 'safety_notes', args: { operation: 'replace heating element' } },
+      ],
+    };
   }
 
   async calibrateTeam(input: TeamCalibrationInput): Promise<TeamCalibration> {

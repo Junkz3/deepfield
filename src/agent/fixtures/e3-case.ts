@@ -32,10 +32,3 @@ export const E3_DIAGNOSIS: Diagnosis = {
   componentKey: 'heater',
 };
 
-export const E3_FLIPPED_DIAGNOSIS: Diagnosis = {
-  component: 'Thermistor / OWI sensor',
-  cause: 'Heater measures within spec; the thermistor reporting water temperature is now the prime suspect.',
-  checks: ['Measure thermistor resistance (spec 48-55 kilo-ohms at 25 C)', 'Check thermistor connector continuity to control'],
-  instruction: 'Since the heater checks out, move to the thermistor: it should read 48-55 kilo-ohms at room temperature.',
-  componentKey: 'thermistor',
-};

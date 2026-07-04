@@ -1,7 +1,7 @@
 import type { Conversation, Diagnosis, Document, GuidedStep, PartLine, PhaseEvent, SafetyInfo, ScoredPage, WorkOrder } from './types';
 import type { ModelDriver } from './driver';
 import { candidatePages, pageTitle, trimPool } from './taxonomy';
-import { activeTools, checkMeasurement } from './tools';
+import { activeTools } from './tools';
 import { computeConfidence, workOrderConfidence } from './confidence';
 import { activeAgents, setWorkflowProfile, workflowProfile } from './workflow';
 
@@ -40,37 +40,9 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     if (team.length > 1) yield emit({ phase: 'plan', summary: `Routed to ${chosen.label}` });
   }
 
-  // Measurement pivot path: tool call decides, then re-diagnose
-  if (userInput?.startsWith('report-measurement:')) {
-    const [, component, value] = userInput.split(':');
-    yield emit({ phase: 'tools', summary: `Checking ${component} reading against manual spec` });
-    const verdict = await checkMeasurement(component, Number(value));
-    yield emit({ phase: 'tools', summary: verdict.verdict });
-    if (verdict.withinSpec && verdict.suggestedComponent) {
-      yield emit({ phase: 'reason', summary: `Hypothesis changed: ${component} is OK, pivoting to ${verdict.suggestedComponent}` });
-      const diagnosis = await driver.diagnose(q, []); // pivot contract
-      const ctx = { device: conversation.device, component: verdict.suggestedComponent };
-      const partTool = activeTools().find((t) => t.id === 'part_lookup');
-      const safetyTool = activeTools().find((t) => t.id === 'safety_notes');
-      yield emit({ phase: 'tools', summary: 'Checking replacement part availability' });
-      const partRun = partTool ? await partTool.run({ component: verdict.suggestedComponent }, ctx) : undefined;
-      const safetyRun = safetyTool ? await safetyTool.run({ operation: `replace ${verdict.suggestedComponent}` }, ctx) : undefined;
-      yield emit({ phase: 'decide', summary: `Next: test the ${verdict.suggestedComponent}` });
-      const conf = computeConfidence({ exactCodeMatch: true, corroboratingCitations: 1, requiredPageMissing: false });
-      const part = partRun?.part;
-      return {
-        index: conversation.steps.length, phaseEvents: events, agentLabel,
-        instruction: diagnosis.instruction ? `${verdict.verdict} ${diagnosis.instruction}` : `${verdict.verdict} Now test the ${verdict.suggestedComponent}: ${diagnosis.checks[0]}`,
-        citations: [], proposedNext: [
-          ...(part ? [{ label: `Order ${part.name} (${part.ref})`, action: `order-part:${part.ref}` }] : []),
-          { label: `${verdict.suggestedComponent} also in spec`, action: `report-measurement:${verdict.suggestedComponent}:52000` },
-          { label: 'Compile work order', action: 'compile-work-order' },
-        ],
-        confidence: conf.value, confidenceReason: conf.reason, status: 'ok',
-        diagnosis, parts: part ? [part] : undefined, safety: safetyRun?.safety,
-      };
-    }
-  }
+  // A reported measurement is plain conversation: the technician types the
+  // reading, the plan reforges around it and the next verdict weighs it
+  // against the values printed in the manual pages - no invented spec table.
 
   // RETRIEVE (driven by sufficiency, max 3)
   const candidates = candidatePages(docs, conversation.device);
@@ -265,14 +237,10 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
       ? `Agent requested: ${requested.map((x) => x.tool.label.toLowerCase()).join(', ')}`
       : 'Cross-checking the cited sources',
   });
-  let part: PartLine | undefined;
-  let safety: SafetyInfo | undefined;
   // Lookup ops search the workspace corpus themselves - hand them the pages.
   const toolCtx = { device: conversation.device, component: `${diagnosis.componentKey ?? ''} ${diagnosis.component}`.trim(), pages: candidates };
   for (const { req, tool } of requested) {
     const run = await tool.run(req.args ?? {}, toolCtx);
-    part = part ?? run.part;
-    safety = safety ?? run.safety;
     yield emit({
       phase: 'tools',
       summary: `${tool.label}: ${run.summary}`,
@@ -302,19 +270,9 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   const conf = computeConfidence({ exactCodeMatch, corroboratingCitations: distinctSources - 1, requiredPageMissing: evidenceIncomplete });
   yield emit({ phase: 'decide', summary: `First check: ${diagnosis.checks[0] ?? diagnosis.instruction ?? 'see cited pages'}` });
 
-  // Proposed actions follow the DIAGNOSIS, not a fixed script. The machine
-  // key stays English even when the display language does not.
-  const component = `${diagnosis.componentKey ?? ''} ${diagnosis.component}`.toLowerCase();
-  const canMeasure = ops.some((t) => t.kind === 'capture');
+  // Proposed actions follow the DIAGNOSIS, not a fixed script. Measurements
+  // are typed into the open reply (real values, not pre-filled buttons).
   const proposedNext: { label: string; action: string }[] = [];
-  if (canMeasure && component.includes('heat')) {
-    proposedNext.push(
-      { label: 'Heater measured 22 ohms (in spec)', action: 'report-measurement:heating element:22' },
-      { label: 'Heater open circuit (0 ohms)', action: 'report-measurement:heating element:0' },
-    );
-  } else if (canMeasure && (component.includes('thermistor') || component.includes('sensor'))) {
-    proposedNext.push({ label: 'Sensor reads in spec', action: 'report-measurement:thermistor:52000' });
-  }
   const hasVideo = candidates.some((p) => p.kind === 'video-segment');
   if (hasVideo) proposedNext.push({ label: 'Show me the replacement video', action: 'find-video' });
   if (citations.length > 1) proposedNext.push({ label: 'Show the corroborating page', action: 'show-citation:1' });
@@ -327,7 +285,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     citations,
     proposedNext: proposedNext.slice(0, 5),
     confidence: conf.value, confidenceReason: conf.reason, status: 'ok',
-    diagnosis, parts: part ? [part] : undefined, safety,
+    diagnosis,
   };
 }
 
