@@ -54,6 +54,13 @@ export function pickFactPages(docs: Document[], count = 3): Page[] {
   return out;
 }
 
+/** Thousand separators differ across languages: the agent answers "£50 000"
+ *  (French) where the policy prints "£50,000". Strip separators that sit
+ *  before exactly 3 digits so decimals ("1,5") survive. */
+const normalizeNumbers = (s: string) => s.toLowerCase()
+  .replace(/(\d)[\s,'](?=\d{3}(?!\d))/g, '$1')
+  .replace(/(\d)\s+(?=%)/g, '$1');
+
 /** A probe passes when the answer quotes at least one literal expected value
  *  AND cites the source page (±1: facts straddle page boundaries). */
 export function scoreProbe(
@@ -62,8 +69,8 @@ export function scoreProbe(
   probe: ProbeSpec,
   source: { docId: string; page: number },
 ): { factFound: boolean; pageCited: boolean; passed: boolean } {
-  const hay = answer.toLowerCase();
-  const factFound = probe.mustContain.some((k) => hay.includes(k.toLowerCase()));
+  const hay = normalizeNumbers(answer);
+  const factFound = probe.mustContain.some((k) => hay.includes(normalizeNumbers(k)));
   const pageCited = citations.some((c) => c.docId === source.docId && Math.abs(c.page - source.page) <= 1);
   return { factFound, pageCited, passed: factFound && pageCited };
 }

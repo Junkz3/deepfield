@@ -60,4 +60,19 @@ describe('scoreProbe', () => {
     const v = scoreProbe('$129 de franchise', [cite('b', 9)], probe, { docId: 'a', page: 3 });
     expect(v).toEqual({ factFound: true, pageCited: false, passed: false });
   });
+
+  it('matches across thousand-separator styles but keeps decimals distinct', () => {
+    const p50k = { question: 'q', mustContain: ['£50,000'] };
+    // French answer: non-breaking thin space as thousands separator
+    expect(scoreProbe('indemnité de £50 000 (p.81)', [cite('a', 81)], p50k, { docId: 'a', page: 81 }).passed).toBe(true);
+    expect(scoreProbe('indemnité de £50000', [cite('a', 81)], p50k, { docId: 'a', page: 81 }).passed).toBe(true);
+    // decimal comma must NOT collapse into a thousands match
+    const p15 = { question: 'q', mustContain: ['1,500 rpm'] };
+    expect(scoreProbe('vitesse de 1,5 rpm', [cite('a', 81)], p15, { docId: 'a', page: 81 }).factFound).toBe(false);
+  });
+
+  it('matches percentages across typography (90% vs 90 %)', () => {
+    const p90 = { question: 'q', mustContain: ['90%'] };
+    expect(scoreProbe('Remboursement : 90 % (p.15)', [cite('a', 15)], p90, { docId: 'a', page: 15 }).passed).toBe(true);
+  });
 });

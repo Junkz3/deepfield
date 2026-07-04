@@ -213,11 +213,18 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
 
   async generateProbe(page: { page: number; text: string }): Promise<{ question: string; mustContain: string[] } | null> {
     if (page.text.trim().length < 120) return null;
-    const text = await chatText(this.t, MODELS.omni,
-      `You are auditing a document-grounded assistant. Here is the text of page ${page.page}:\n"${page.text.slice(0, 900)}"\nWrite ONE question a real user of this document would naturally ask, whose answer is verifiably printed in this text. Do NOT mention the page or the document in the question. Return STRICT JSON: {"question": string (in ${AGENT_LANG}), "mustContain": [2-3 short LITERAL values or terms copied VERBATIM from the text that any correct answer must contain - prefer amounts, ratios, codes, defined names]}. Do not deliberate: at most 20 words of internal reasoning, then ONLY the JSON.`, 8000);
-    const v = extractJson<{ question: string; mustContain: string[] }>(text, { question: '', mustContain: [] });
-    if (!v.question || !Array.isArray(v.mustContain) || v.mustContain.length === 0) return null;
-    return { question: v.question, mustContain: v.mustContain.map(String) };
+    const basePrompt = `You are auditing a document-grounded assistant. Here is the text of page ${page.page}:\n"${page.text.slice(0, 900)}"\nWrite ONE question a real user of this document would naturally ask, whose answer is verifiably printed in this text. Pick a fact that is UNIQUE and unambiguous on this page - never one row of a large table of similar rows (a reader could grab the neighbouring cell). Do NOT mention the page or the document in the question. Return STRICT JSON: {"question": string (in ${AGENT_LANG}), "mustContain": [2-3 language-neutral LITERAL values copied VERBATIM from the text (amounts, percentages, ratios, codes, product names) - the checker matches them in answers possibly written in ANOTHER language, so NEVER sentences or words of prose]}. Do not deliberate: at most 20 words of internal reasoning, then ONLY the JSON.`;
+    for (const strict of [false, true]) {
+      const prompt = strict
+        ? `YOUR PREVIOUS ATTEMPT WAS CUT BY THE TOKEN CAP BEFORE ANY OUTPUT. Do NOT deliberate: at most 20 words of internal reasoning, then the JSON object immediately.\n${basePrompt}`
+        : basePrompt;
+      const text = await chatText(this.t, MODELS.omni, prompt, 8000);
+      const v = extractJson<{ question: string; mustContain: string[] }>(text, { question: '', mustContain: [] });
+      if (v.question && Array.isArray(v.mustContain) && v.mustContain.length > 0) {
+        return { question: v.question, mustContain: v.mustContain.map(String) };
+      }
+    }
+    return null;
   }
 
   async tagPages(pages: { page: number; text?: string }[]): Promise<Record<number, PageKind>> {
