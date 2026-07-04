@@ -12,7 +12,7 @@ import { pageTitle } from '../../agent/taxonomy';
 import { useApp } from '../store';
 import displayFont from '@fontsource/space-grotesk/files/space-grotesk-latin-500-normal.woff?url';
 
-const R = 2.1; // shell radius of the file planet
+const R = 2.75; // shell radius of the file planet
 
 const CAT_COLORS: Record<string, string> = {
   'dishwasher': '#59c2ff',
@@ -438,16 +438,17 @@ function FileCard({ node, targetPos, ghost, isHit, hitCount, onHover, onSelect }
             <meshBasicMaterial color="#ffb454" transparent opacity={0.85} depthWrite={false} />
           </mesh>
         )}
-        {!ghost && (
+        {!ghost && isHit && (
           <Text
-            position={[0, -0.31, 0]}
+            font={displayFont}
+            position={[0, -0.33, 0]}
             fontSize={0.095}
-            color={isHit ? '#ffffff' : '#93a3b3'}
+            color="#ffffff"
             anchorX="center"
             outlineWidth={0.005}
             outlineColor="#080b10"
           >
-            {node.doc.model}
+            {node.doc.model.split('(')[0].trim().slice(0, 26)}
           </Text>
         )}
         {isHit && hitCount > 0 && (
@@ -557,7 +558,7 @@ function CameraRig({ focus, panelOpen }: { focus: THREE.Vector3 | null; panelOpe
     }
     c.target.lerp(lookTarget, Math.min(dt * 2.4, 1));
 
-    const wantDist = focus ? 5.4 : 7.4;
+    const wantDist = focus ? 6.2 : 10.2;
     const dir = new THREE.Vector3().subVectors(camera.position, c.target);
     const newDist = THREE.MathUtils.lerp(dir.length(), wantDist, Math.min(dt * 1.6, 1));
     camera.position.copy(c.target.clone().addScaledVector(dir.normalize(), newDist));
@@ -568,8 +569,8 @@ function CameraRig({ focus, panelOpen }: { focus: THREE.Vector3 | null; panelOpe
     <OrbitControls
       ref={controls}
       enablePan={false}
-      minDistance={3.4}
-      maxDistance={13}
+      minDistance={5}
+      maxDistance={18}
       maxPolarAngle={Math.PI * 0.72}
       minPolarAngle={Math.PI * 0.18}
     />
@@ -669,8 +670,8 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
       {catAnchors.map((c) => {
         const catInScope = nodes.some((n) => n.doc.category === c.label && inScope(n.doc.id));
         return (
-          <Billboard key={c.label} position={c.dir.clone().multiplyScalar(R + 0.72).toArray()}>
-            <Text font={displayFont} fontSize={0.082} color={c.color} anchorX="center" letterSpacing={0.22} outlineWidth={0.005} outlineColor="#080b10" fillOpacity={catInScope ? 0.8 : 0.1}>
+          <Billboard key={c.label} position={c.dir.clone().multiplyScalar(R + 0.5).toArray()}>
+            <Text font={displayFont} fontSize={0.082} color={c.color} anchorX="center" letterSpacing={0.22} outlineWidth={0.005} outlineColor="#080b10" fillOpacity={catInScope ? 0.68 : 0.08}>
               {c.label.toUpperCase()}
             </Text>
           </Billboard>
@@ -724,7 +725,7 @@ export function Galaxy3D({ panelOpen = false, scopeIds = null, onSelectDoc, onOp
   const [hover, setHover] = useState<{ doc: Document; x: number; y: number } | null>(null);
   return (
     <div className="galaxy-wrap">
-      <Canvas camera={{ position: [0, 2.0, 7.4], fov: 42 }} dpr={[1, 2]}>
+      <Canvas camera={{ position: [0, 2.6, 10.2], fov: 42 }} dpr={[1, 2]}>
         <Scene
           panelOpen={panelOpen}
           scopeIds={scopeIds}
