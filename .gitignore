@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.dev.vars
+.wrangler/
+corpus/src/
+*.log
