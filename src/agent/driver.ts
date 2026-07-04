@@ -30,6 +30,9 @@ export class FakeDriver implements ModelDriver {
       const [, component, value] = q.userInput.split(':');
       return { goal: `Re-evaluate: ${component} measured ${value} ohms - verify against spec, pivot to thermistor if in spec`, queries: [] };
     }
+    if (q.userInput === 'find-video') {
+      return { goal: 'Find a visual walkthrough for the heating element replacement', queries: ['heating element replacement walkthrough'] };
+    }
     return E3_PLAN;
   }
 
@@ -37,9 +40,13 @@ export class FakeDriver implements ModelDriver {
     await this.pace('retrieve');
     const q = query.toLowerCase();
     const score = (p: Page): number => {
+      if ((q.includes('walkthrough') || q.includes('replacement') || q.includes('how to')) && p.kind === 'video-segment') {
+        // the key replacement moments rank highest
+        return /detach|insert|shut off/.test(p.text ?? '') ? 5.8 : 3.2;
+      }
       if ((q.includes('e3') || q.includes('error')) && p.kind === 'error-table') return 6.7;
       if ((q.includes('wiring') || q.includes('diagram') || q.includes('schematic')) && p.kind === 'schematic') return 4.2;
-      if (p.kind === 'troubleshooting') return 2.4;
+      if (p.kind === 'troubleshooting' && !q.includes('walkthrough')) return 2.4;
       return 0.8;
     };
     return candidates.map((page) => ({ page, score: score(page) })).sort((a, b) => b.score - a.score);
@@ -47,12 +54,26 @@ export class FakeDriver implements ModelDriver {
 
   async assessSufficiency(_q: { device: string; symptom: string }, found: ScoredPage[]): Promise<SufficiencyVerdict> {
     await this.pace('assessSufficiency');
+    if (found.some((f) => f.page.kind === 'video-segment')) {
+      return { sufficient: true, reason: 'Official walkthrough segments found with exact timestamps.' };
+    }
     const hasSchematic = found.some((f) => f.page.kind === 'schematic');
     return hasSchematic ? { sufficient: true, reason: 'Error table plus wiring diagram cover the fault path.' } : E3_SUFFICIENCY;
   }
 
   async diagnose(_q: { device: string; symptom: string }, evidence: Page[], _techPhoto?: string): Promise<Diagnosis> {
     await this.pace('diagnose');
+    if (evidence.some((p) => p.kind === 'video-segment')) {
+      return {
+        component: 'Heating element - guided replacement',
+        cause: 'Official manufacturer walkthrough found; key steps cited with exact video timestamps.',
+        checks: [
+          'Shut off the water supply valve (video 0:28)',
+          'Detach the old heating element from the brackets (video 2:29)',
+          'Insert the new element terminals through the tank bottom (video 2:46)',
+        ],
+      };
+    }
     const flipped = evidence.length === 0; // loop passes [] after an in-spec measurement pivot
     return flipped ? E3_FLIPPED_DIAGNOSIS : E3_DIAGNOSIS;
   }

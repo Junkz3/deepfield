@@ -81,6 +81,10 @@ function Shell() {
           <Galaxy3D
             panelOpen={inConversation}
             scopeIds={scopeIds}
+            onSelectDoc={(docId) => {
+              const doc = docs.find((d) => d.id === docId);
+              if (doc?.pages[0]) dispatch({ type: 'open-lightbox', docId, page: doc.pages[0].page });
+            }}
             onOpenPage={(docId, page) => dispatch({ type: 'open-lightbox', docId, page })}
           />
         </Suspense>

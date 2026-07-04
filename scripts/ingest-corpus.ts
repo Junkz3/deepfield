@@ -9,11 +9,12 @@ import { buildTaxonomy } from '../src/agent/taxonomy';
 import type { Document, Page, PageKind, Region } from '../src/agent/types';
 
 interface ManifestDoc { id: string; file: string; pages: string; category: string; brand: string; model: string; docType: Document['docType']; sourceRights: string; kinds: Record<string, PageKind>; regions?: Record<string, Region> }
+interface ManifestVideo { id: string; videoId: string; url: string; title: string; category: string; brand: string; model: string; sourceRights: string; chaptersFile: string }
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const SRC = join(ROOT, 'corpus/src');
 const OUT = join(ROOT, 'public/corpus');
-const manifest = JSON.parse(readFileSync(join(ROOT, 'corpus/manifest.json'), 'utf8')) as { docs: ManifestDoc[] };
+const manifest = JSON.parse(readFileSync(join(ROOT, 'corpus/manifest.json'), 'utf8')) as { docs: ManifestDoc[]; videos?: ManifestVideo[] };
 const only = process.argv[2];
 
 function parseRanges(spec: string, pageCount: number): number[] {
@@ -54,6 +55,36 @@ for (const m of manifest.docs) {
   }
   console.log();
   docs.push({ id: m.id, filename: m.file, format: 'pdf', category: m.category, brand: m.brand, model: m.model, docType: m.docType, pages: docPages, sourceRights: m.sourceRights, origin: 'corpus' });
+}
+
+// Videos: chapters become timestamped segment pages; the official thumbnail is
+// the segment image (embedded player handles playback - nothing re-hosted).
+for (const v of manifest.videos ?? []) {
+  if (only && v.id !== only) continue;
+  const chapters = JSON.parse(readFileSync(join(ROOT, 'corpus', v.chaptersFile), 'utf8')) as { timestamp: number; title: string }[];
+  const thumb = `/corpus/${v.id}/thumb.jpg`;
+  if (!existsSync(join(ROOT, 'public', thumb.slice(1)))) console.warn(`WARN ${v.id}: missing ${thumb}`);
+  docs.push({
+    id: v.id,
+    filename: v.title,
+    format: 'video',
+    category: v.category,
+    brand: v.brand,
+    model: v.model,
+    docType: 'video',
+    sourceRights: v.sourceRights,
+    origin: 'corpus',
+    pages: chapters.map((c, i) => ({
+      docId: v.id,
+      page: i + 1,
+      imageUrl: thumb,
+      text: c.title,
+      kind: 'video-segment' as PageKind,
+      timestamp: c.timestamp,
+      videoUrl: v.url,
+    })),
+  });
+  console.log(`${v.id}: ${chapters.length} segments`);
 }
 
 mkdirSync(OUT, { recursive: true });

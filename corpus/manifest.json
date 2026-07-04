@@ -1,4 +1,17 @@
 {
+  "videos": [
+    {
+      "id": "video-w10518394",
+      "videoId": "xX5-ruvqZaI",
+      "url": "https://www.youtube.com/watch?v=xX5-ruvqZaI",
+      "title": "Heating Element Replacement walkthrough",
+      "category": "dishwasher",
+      "brand": "Whirlpool",
+      "model": "W10518394 walkthrough",
+      "sourceRights": "RepairClinic.com (YouTube) - official embedded player, chapter timestamps from the video itself; nothing re-hosted",
+      "chaptersFile": "video-chapters.json"
+    }
+  ],
   "docs": [
     {
       "id": "whirlpool-w11187658",

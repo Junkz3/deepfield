@@ -114,7 +114,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     proposedNext: [
       { label: 'Heater measured 22 ohms (in spec)', action: 'report-measurement:heating element:22' },
       { label: 'Heater open circuit (0 ohms)', action: 'report-measurement:heating element:0' },
-      { label: 'Show the wiring diagram', action: 'show-citation:1' },
+      { label: 'Show me the replacement video', action: 'find-video' },
     ],
     confidence: conf.value, confidenceReason: conf.reason, status: 'ok',
     diagnosis, parts: [part], safety,

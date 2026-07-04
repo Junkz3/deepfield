@@ -27,7 +27,9 @@ function CiteChips({ citations, onOpen }: { citations: Citation[]; onOpen: (c: C
     <div className="cite-chips">
       {citations.map((c, i) => (
         <button key={i} className="cite-chip mono" onClick={() => onOpen(c)} title={c.quote ?? c.label}>
-          p.{c.page}
+          {c.timestamp !== undefined
+            ? `@ ${Math.floor(c.timestamp / 60)}:${String(c.timestamp % 60).padStart(2, '0')}`
+            : `p.${c.page}`}
           <span className="cite-chip-kind">{c.label.match(/\(([^)]+)\)/)?.[1] ?? ''}</span>
         </button>
       ))}

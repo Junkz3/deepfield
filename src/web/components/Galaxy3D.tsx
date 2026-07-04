@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import type { Document } from '../../agent/types';
 import { useApp } from '../store';
 
-const R = 1.9; // shell radius of the file planet
+const R = 2.1; // shell radius of the file planet
 
 const CAT_COLORS: Record<string, string> = {
   'dishwasher': '#59c2ff',
@@ -51,6 +51,21 @@ function fileCardTexture(color: string): THREE.CanvasTexture {
   const tex = new THREE.CanvasTexture(c);
   cardTextureCache.set(color, tex);
   return tex;
+}
+
+let playBadgeTex: THREE.CanvasTexture | null = null;
+function playBadge(): THREE.CanvasTexture {
+  if (playBadgeTex) return playBadgeTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 96;
+  const g = c.getContext('2d')!;
+  g.beginPath(); g.arc(48, 48, 40, 0, Math.PI * 2);
+  g.fillStyle = 'rgba(8, 11, 16, 0.72)'; g.fill();
+  g.lineWidth = 4; g.strokeStyle = '#ffffff'; g.stroke();
+  g.beginPath(); g.moveTo(38, 30); g.lineTo(70, 48); g.lineTo(38, 66); g.closePath();
+  g.fillStyle = '#ffffff'; g.fill();
+  playBadgeTex = new THREE.CanvasTexture(c);
+  return playBadgeTex;
 }
 
 function radialSprite(rgb: string): THREE.CanvasTexture {
@@ -205,33 +220,65 @@ function FileCard({ node, targetPos, ghost, isHit, hitCount, onHover, onSelect }
     if (root.current) root.current.position.lerp(targetPos, Math.min(dt * 2.6, 1));
     if (!mat.current) return;
     const t = clock.elapsedTime;
-    const base = ghost ? 0.06 : isHit ? 1 : 0.68;
-    const flicker = ghost ? 0 : Math.sin(t * (1.6 + (seed % 3) * 0.5) + seed) * 0.1;
+    const hasCover = !!cover;
+    const base = ghost ? (hasCover ? 0.08 : 0.06) : isHit ? 1 : hasCover ? 0.95 : 0.68;
+    const flicker = ghost || hasCover ? 0 : Math.sin(t * (1.6 + (seed % 3) * 0.5) + seed) * 0.1;
     mat.current.opacity = base + flicker;
   });
 
-  const texture = fileCardTexture(node.color);
-  const scale: [number, number] = isHit ? [0.42, 0.525] : [0.3, 0.375];
+  // Real face of the document: its first page (or the video thumbnail).
+  const coverUrl = node.doc.pages[0]?.imageUrl || '';
+  const [cover, setCover] = useState<THREE.Texture | null>(null);
+  useEffect(() => {
+    if (!coverUrl) { setCover(null); return; }
+    let alive = true;
+    new THREE.TextureLoader().load(coverUrl, (t) => {
+      if (alive) { t.colorSpace = THREE.SRGBColorSpace; setCover(t); }
+    }, undefined, () => { if (alive) setCover(null); });
+    return () => { alive = false; };
+  }, [coverUrl]);
+
+  const isVideo = node.doc.format === 'video';
+  const holo = fileCardTexture(node.color);
+  const k = isHit ? 1.35 : 1;
+  const dims: [number, number] = isVideo ? [0.38 * k, 0.285 * k] : [0.3 * k, 0.39 * k];
 
   return (
     <group ref={root} position={node.pos}>
       <Billboard>
+        {/* category-tinted frame behind the real cover */}
+        {cover && (
+          <mesh position={[0, 0, -0.005]}>
+            <planeGeometry args={[dims[0] + 0.022, dims[1] + 0.022]} />
+            <meshBasicMaterial color={node.color} transparent opacity={ghost ? 0.05 : isHit ? 1 : 0.75} depthWrite={false} />
+          </mesh>
+        )}
         <mesh
+          key={cover ? 'cover' : 'holo'}
           onPointerOver={(e) => { if (ghost) return; e.stopPropagation(); onHover({ doc: node.doc, x: e.clientX ?? 0, y: e.clientY ?? 0 }); document.body.style.cursor = 'pointer'; }}
           onPointerOut={() => { if (ghost) return; onHover(null); document.body.style.cursor = ''; }}
           onClick={(e) => { if (ghost) return; e.stopPropagation(); onSelect(node.doc.id); }}
         >
-          <planeGeometry args={scale} />
-          <meshBasicMaterial
-            ref={mat}
-            map={texture}
-            transparent
-            depthWrite={false}
-            side={THREE.DoubleSide}
-            color={isHit ? '#ffffff' : node.color}
-            blending={THREE.AdditiveBlending}
-          />
+          <planeGeometry args={dims} />
+          {cover ? (
+            <meshBasicMaterial ref={mat} map={cover} transparent depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
+          ) : (
+            <meshBasicMaterial
+              ref={mat}
+              map={holo}
+              transparent
+              depthWrite={false}
+              side={THREE.DoubleSide}
+              color={isHit ? '#ffffff' : node.color}
+              blending={THREE.AdditiveBlending}
+            />
+          )}
         </mesh>
+        {isVideo && !ghost && (
+          <sprite position={[0, 0, 0.01]} scale={[0.11, 0.11, 1]}>
+            <spriteMaterial map={playBadge()} transparent depthWrite={false} />
+          </sprite>
+        )}
         {node.doc.origin === 'session' && (
           <mesh position={[0, 0, -0.01]}>
             <ringGeometry args={[0.3, 0.315, 32]} />
@@ -277,8 +324,8 @@ function FileCard({ node, targetPos, ghost, isHit, hitCount, onHover, onSelect }
 
 /* ---------- the agent reads: real manual pages fan out in space ---------- */
 
-function FloatingPage({ url, index, total, anchor, color, onClick }: {
-  url: string; index: number; total: number; anchor: THREE.Vector3; color: string; onClick: () => void;
+function FloatingPage({ url, label, index, total, anchor, color, onClick }: {
+  url: string; label?: string; index: number; total: number; anchor: THREE.Vector3; color: string; onClick: () => void;
 }) {
   const [tex, setTex] = useState<THREE.Texture | null>(null);
   const group = useRef<THREE.Group>(null);
@@ -324,6 +371,11 @@ function FloatingPage({ url, index, total, anchor, color, onClick }: {
           <planeGeometry args={[0.54, 0.72]} />
           <meshBasicMaterial map={tex} toneMapped={false} />
         </mesh>
+        {label && (
+          <Text position={[0, -0.44, 0]} fontSize={0.1} color="#ffc678" anchorX="center" outlineWidth={0.006} outlineColor="#080b10">
+            {label}
+          </Text>
+        )}
       </Billboard>
     </group>
   );
@@ -398,8 +450,8 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
       const tangentA = new THREE.Vector3().crossVectors(anchor.dir, new THREE.Vector3(0, 1, 0)).normalize();
       const tangentB = new THREE.Vector3().crossVectors(anchor.dir, tangentA).normalize();
       const dir = anchor.dir.clone()
-        .addScaledVector(tangentA, rnd(ci * 13 + di * 7) * 0.34 + (di % 2 === 0 ? 0.14 : -0.14))
-        .addScaledVector(tangentB, rnd(ci * 29 + di * 11) * 0.3)
+        .addScaledVector(tangentA, rnd(ci * 13 + di * 7) * 0.42 + (di % 2 === 0 ? 0.22 : -0.22))
+        .addScaledVector(tangentB, rnd(ci * 29 + di * 11) * 0.42 + (di % 3 === 0 ? 0.12 : -0.08))
         .normalize();
       const sparkCount = Math.min(doc.pages.length, 48);
       out.push({
@@ -434,7 +486,12 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
     if (!focusNode) return [];
     const pages = hitByDoc.get(focusNode.doc.id) ?? [];
     return pages.slice(0, 3)
-      .map((page) => ({ page, url: focusNode.doc.pages.find((p) => p.page === page)?.imageUrl ?? '' }))
+      .map((page) => {
+        const pg = focusNode.doc.pages.find((p) => p.page === page);
+        const ts = pg?.timestamp;
+        const label = ts !== undefined ? `${Math.floor(ts / 60)}:${String(ts % 60).padStart(2, '0')}` : undefined;
+        return { page, url: pg?.imageUrl ?? '', label };
+      })
       .filter((p) => p.url);
   }, [focusNode, hitByDoc]);
 
@@ -486,6 +543,7 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
         <FloatingPage
           key={`${focusNode.doc.id}-${p.page}`}
           url={p.url}
+          label={p.label}
           index={i}
           total={floatingPages.length}
           anchor={livePos(focusNode)}
