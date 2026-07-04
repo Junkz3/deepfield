@@ -1,10 +1,9 @@
-// The technician copilot cockpit: streaming reasoning timeline, cited pages,
-// adaptive guided steps, and the compiled work order.
+// The technician copilot: a glass panel over the universe. The chat narrates
+// on the left; the universe animates the retrieval on the right.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Citation, GuidedStep } from '../../agent/types';
 import { useStepRunner } from '../hooks/useStepRunner';
 import { useApp } from '../store';
-import { CitationPanel } from './CitationPanel';
 import { Timeline } from './Timeline';
 import { WorkOrderView } from './WorkOrderView';
 import './conversation.css';
@@ -22,7 +21,26 @@ function ConfidenceMeter({ value, reason }: { value: number; reason: string }) {
   );
 }
 
-function StepCard({ step, isLast, onAction }: { step: GuidedStep; isLast: boolean; onAction: (action: string) => void }) {
+function CiteChips({ citations, onOpen }: { citations: Citation[]; onOpen: (c: Citation) => void }) {
+  if (citations.length === 0) return null;
+  return (
+    <div className="cite-chips">
+      {citations.map((c, i) => (
+        <button key={i} className="cite-chip mono" onClick={() => onOpen(c)} title={c.quote ?? c.label}>
+          p.{c.page}
+          <span className="cite-chip-kind">{c.label.match(/\(([^)]+)\)/)?.[1] ?? ''}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function StepCard({ step, isLast, onAction, onOpenCite }: {
+  step: GuidedStep;
+  isLast: boolean;
+  onAction: (action: string) => void;
+  onOpenCite: (c: Citation) => void;
+}) {
   const statusColor =
     step.status === 'ok' ? 'var(--ok)' : step.status === 'no-evidence' ? 'var(--warn)' : step.status === 'error' ? 'var(--err)' : 'var(--info)';
   return (
@@ -33,6 +51,7 @@ function StepCard({ step, isLast, onAction }: { step: GuidedStep; isLast: boolea
       </header>
       <Timeline events={step.phaseEvents} running={false} />
       <p className="step-instruction">{step.instruction}</p>
+      <CiteChips citations={step.citations} onOpen={onOpenCite} />
       <ConfidenceMeter value={step.confidence} reason={step.confidenceReason} />
       {isLast && step.proposedNext.length > 0 && (
         <div className="step-actions">
@@ -55,7 +74,6 @@ export function ConversationView({ id }: { id: string }) {
   const startedRef = useRef(false);
   const streamRef = useRef<HTMLDivElement>(null);
 
-  // Auto-run the first step when the conversation opens fresh.
   useEffect(() => {
     if (conv && conv.steps.length === 0 && !live.running && !startedRef.current) {
       startedRef.current = true;
@@ -63,23 +81,19 @@ export function ConversationView({ id }: { id: string }) {
     }
   }, [conv, live.running, run]);
 
-  // Keep the stream scrolled to the newest event.
   useEffect(() => {
     streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: 'smooth' });
   }, [live.events.length, conv?.steps.length]);
 
-  const panelCitations: Citation[] = useMemo(() => {
-    if (live.running) {
-      const withCites = [...live.events].reverse().find((e) => e.citations && e.citations.length > 0);
-      if (withCites?.citations) return withCites.citations;
-    }
-    const lastWithCites = conv ? [...conv.steps].reverse().find((s) => s.citations.length > 0) : undefined;
-    return lastWithCites?.citations ?? [];
-  }, [conv, live.events, live.running]);
+  const lastCitations = useMemo(() => {
+    const last = conv ? [...conv.steps].reverse().find((s) => s.citations.length > 0) : undefined;
+    return last?.citations ?? [];
+  }, [conv]);
 
   if (!conv) return null;
 
   const hasCompilableStep = conv.steps.some((s) => s.status === 'ok' && s.diagnosis);
+  const openCite = (c: Citation) => dispatch({ type: 'open-lightbox', docId: c.docId, page: c.page });
 
   const onAction = (action: string) => {
     if (action === 'compile-work-order' || action.startsWith('order-part:')) {
@@ -87,7 +101,9 @@ export function ConversationView({ id }: { id: string }) {
     } else if (action === 'open-ingest') {
       dispatch({ type: 'open-center' });
     } else if (action.startsWith('show-citation:')) {
-      // citations already visible in the panel; no-op selector for now
+      const idx = Number(action.split(':')[1] ?? 0);
+      const c = lastCitations[idx] ?? lastCitations[0];
+      if (c) openCite(c);
     } else {
       void run(action || undefined);
     }
@@ -112,33 +128,28 @@ export function ConversationView({ id }: { id: string }) {
         </div>
       </header>
 
-      <div className="conv-body">
-        <div className="conv-stream" ref={streamRef}>
-          {conv.steps.map((s, i) => (
-            <StepCard
-              key={s.index}
-              step={s}
-              isLast={i === conv.steps.length - 1 && !live.running}
-              onAction={onAction}
-            />
-          ))}
-          {live.running && (
-            <article className="step-card panel live">
-              <header className="step-head">
-                <span className="step-index mono">STEP {conv.steps.length + 1}</span>
-                <span className="step-status mono live-chip">
-                  <span className="live-dot" />
-                  {state.driverKind === 'vultr' ? 'REASONING ON VULTR' : 'REASONING'}
-                </span>
-              </header>
-              <Timeline events={live.events} running />
-            </article>
-          )}
-        </div>
-
-        <aside className="conv-side">
-          <CitationPanel citations={panelCitations} docs={docs} />
-        </aside>
+      <div className="conv-stream" ref={streamRef}>
+        {conv.steps.map((s, i) => (
+          <StepCard
+            key={s.index}
+            step={s}
+            isLast={i === conv.steps.length - 1 && !live.running}
+            onAction={onAction}
+            onOpenCite={openCite}
+          />
+        ))}
+        {live.running && (
+          <article className="step-card panel live">
+            <header className="step-head">
+              <span className="step-index mono">STEP {conv.steps.length + 1}</span>
+              <span className="step-status mono live-chip">
+                <span className="live-dot" />
+                {state.driverKind === 'vultr' ? 'REASONING ON VULTR' : 'REASONING'}
+              </span>
+            </header>
+            <Timeline events={live.events} running />
+          </article>
+        )}
       </div>
 
       {showWorkOrder && (

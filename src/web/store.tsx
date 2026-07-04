@@ -19,6 +19,7 @@ export interface AppState {
   driverKind: DriverKind;
   highlight: { docId: string; page: number }[];
   scanning: boolean;
+  lightbox: { docId: string; page: number } | null;
 }
 
 export type Action =
@@ -31,6 +32,8 @@ export type Action =
   | { type: 'set-highlight'; pages: { docId: string; page: number }[] }
   | { type: 'set-scanning'; scanning: boolean }
   | { type: 'set-driver'; kind: DriverKind }
+  | { type: 'open-lightbox'; docId: string; page: number }
+  | { type: 'close-lightbox' }
   | { type: 'demo-reset' };
 
 const LS_KEY = 'rc.conversations';
@@ -58,6 +61,7 @@ export const initialState: AppState = {
   driverKind: 'fake',
   highlight: [],
   scanning: false,
+  lightbox: null,
 };
 
 export function reducer(state: AppState, a: Action): AppState {
@@ -90,6 +94,10 @@ export function reducer(state: AppState, a: Action): AppState {
       return { ...state, scanning: a.scanning };
     case 'set-driver':
       return { ...state, driverKind: a.kind };
+    case 'open-lightbox':
+      return { ...state, lightbox: { docId: a.docId, page: a.page } };
+    case 'close-lightbox':
+      return { ...state, lightbox: null };
     case 'demo-reset':
       localStorage.removeItem(LS_KEY);
       return {
@@ -99,6 +107,7 @@ export function reducer(state: AppState, a: Action): AppState {
         activeView: { kind: 'center' },
         highlight: [],
         scanning: false,
+        lightbox: null,
       };
     default:
       return state;

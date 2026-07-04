@@ -1,12 +1,19 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { AppProvider, useApp } from './store';
 import { Sidebar } from './components/Sidebar';
 import { ConversationView } from './components/ConversationView';
-import { GalaxyView } from './components/GalaxyView';
+import { CommandBar } from './components/CommandBar';
+import { PageLightbox } from './components/PageLightbox';
+import { TreePanel } from './components/TreePanel';
 import './app.css';
+import './components/galaxy.css';
+
+const Galaxy3D = lazy(() => import('./components/Galaxy3D').then((m) => ({ default: m.Galaxy3D })));
 
 function Shell() {
   const { state, dispatch } = useApp();
+  const [showTree, setShowTree] = useState(false);
+  const inConversation = state.activeView.kind === 'conversation';
 
   // Global shortcuts: Ctrl+Shift+R = demo reset, Ctrl+Shift+D = driver toggle.
   useEffect(() => {
@@ -27,12 +34,36 @@ function Shell() {
   return (
     <div className="shell">
       <Sidebar />
-      <main className="main">
-        {state.activeView.kind === 'center' ? (
-          <GalaxyView />
-        ) : (
-          <ConversationView id={state.activeView.id} />
+      <main className="main stage">
+        {/* The universe is the permanent backdrop of everything. */}
+        <Suspense fallback={<div className="galaxy-loading mono">Charting the knowledge universe…</div>}>
+          <Galaxy3D
+            panelOpen={inConversation}
+            onOpenPage={(docId, page) => dispatch({ type: 'open-lightbox', docId, page })}
+          />
+        </Suspense>
+
+        {!inConversation && (
+          <>
+            <button className={`galaxy-tree-toggle btn ${showTree ? 'active' : ''}`} onClick={() => setShowTree(!showTree)}>
+              Knowledge tree
+            </button>
+            {showTree && (
+              <div className="galaxy-tree-drawer fade-up">
+                <TreePanel />
+              </div>
+            )}
+            <CommandBar />
+          </>
         )}
+
+        {inConversation && state.activeView.kind === 'conversation' && (
+          <div className="conv-panel fade-up">
+            <ConversationView id={state.activeView.id} />
+          </div>
+        )}
+
+        <PageLightbox />
       </main>
     </div>
   );

@@ -352,3 +352,150 @@
 .newconv-ask { display: flex; align-items: center; gap: var(--sp-2); }
 .newconv-ask-label { color: var(--text-faint); font-size: var(--fs-xs); letter-spacing: 0.14em; }
 .newconv-ask input { flex: 1; }
+
+/* ---- Glass panel layout (universe behind, chat in front) ---- */
+
+.conv-panel {
+  position: absolute;
+  top: var(--sp-4);
+  left: var(--sp-4);
+  bottom: var(--sp-4);
+  width: min(640px, 46%);
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  background: rgba(13, 18, 25, 0.68);
+  backdrop-filter: blur(18px) saturate(1.1);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+}
+
+.conv-panel .conv-head {
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.conv-panel .step-card {
+  background: rgba(20, 27, 36, 0.55);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+/* ---- Citation chips ---- */
+
+.cite-chips { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.cite-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--info);
+  font-size: var(--fs-xs);
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+.cite-chip:hover { border-color: var(--info); background: rgba(89, 194, 255, 0.08); }
+.cite-chip-kind { color: var(--text-faint); }
+
+/* ---- Command bar (tempered glass) ---- */
+
+.cmdbar-zone {
+  position: absolute;
+  bottom: var(--sp-6);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  width: min(720px, 90%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.cmdbar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+  border-radius: 16px;
+  background: rgba(15, 21, 28, 0.55);
+  backdrop-filter: blur(20px) saturate(1.15);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: border-color var(--t-med), box-shadow var(--t-med);
+}
+.cmdbar:focus-within {
+  border-color: rgba(255, 180, 84, 0.55);
+  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.55), 0 0 24px rgba(255, 180, 84, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.cmdbar-input {
+  flex: 1;
+  background: none;
+  border: none;
+  font-size: var(--fs-md);
+  color: var(--text);
+  padding: var(--sp-2) 0;
+}
+.cmdbar-input:focus { border: none; }
+
+.cmdbar-clip {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--text-dim);
+  border: 1px solid transparent;
+  overflow: hidden;
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+.cmdbar-clip:hover { color: var(--accent); border-color: var(--line-strong); }
+.cmdbar-clip img { width: 100%; height: 100%; object-fit: cover; border-radius: 9px; }
+
+.cmdbar-go {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--accent-dim);
+  color: var(--accent-strong);
+  border: 1px solid rgba(255, 180, 84, 0.4);
+  transition: background var(--t-fast), transform var(--t-fast);
+}
+.cmdbar-go:hover:not(:disabled) { background: rgba(255, 180, 84, 0.26); }
+.cmdbar-go:active { transform: translateY(1px); }
+.cmdbar-go:disabled { opacity: 0.35; cursor: default; }
+
+.cmdbar-presets { display: flex; gap: var(--sp-2); }
+.cmdbar-preset {
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  background: rgba(15, 21, 28, 0.5);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  letter-spacing: 0.04em;
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+.cmdbar-preset:hover { color: var(--accent-strong); border-color: rgba(255, 180, 84, 0.4); }
+
+.lightbox-meta {
+  position: fixed;
+  top: var(--sp-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 61;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.06em;
+  background: rgba(11, 15, 20, 0.8);
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+}
