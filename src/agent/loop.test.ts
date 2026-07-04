@@ -36,8 +36,8 @@ describe('runStep - hero E3 first step', () => {
     expect(decisionEvent, 'the autonomous re-retrieve decision must be narrated').toBeTruthy();
     expect(step.status).toBe('ok');
     expect(step.citations.map((c) => c.page)).toEqual(expect.arrayContaining([18, 25]));
-    // distinct-source corroboration: one doc, two page kinds = one corroboration
-    expect(step.confidence).toBeCloseTo(0.8, 5);
+    // distinct-source corroboration: one doc, three page kinds = two corroborations
+    expect(step.confidence).toBeCloseTo(0.9, 5);
     expect(step.proposedNext.length).toBeGreaterThan(0);
     expect(step.instruction).toMatch(/heating element/i);
   });
