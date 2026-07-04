@@ -169,7 +169,7 @@
     {
       "id": "mil-generator-mep803a-operator",
       "file": "mil-generator-mep803a-operator.pdf",
-      "pages": "1-8,64-72",
+      "pages": "1-6,67-69",
       "category": "generator",
       "brand": "US Army (Onan)",
       "model": "MEP-803A / MEP-813A 10kW Tactical Quiet Generator (TM 9-6115-642-10)",
@@ -180,7 +180,7 @@
     {
       "id": "mil-generator-mep803a-maintenance",
       "file": "mil-generator-mep803a-maintenance.pdf",
-      "pages": "1-8,142-150",
+      "pages": "1-6,145-147",
       "category": "generator",
       "brand": "US Army (Onan)",
       "model": "MEP-803A / MEP-813A 10kW Tactical Quiet Generator (TM 9-6115-642-24)",
@@ -191,7 +191,7 @@
     {
       "id": "mil-refrigerator-adr300",
       "file": "mil-refrigerator-adr300.pdf",
-      "pages": "1-8,176-184",
+      "pages": "1-6,179-181",
       "category": "refrigerator",
       "brand": "US Army",
       "model": "ADR-300 Advanced Design Refrigerator, 300 cu ft (TM 10-4110-262-13&P)",
@@ -202,7 +202,7 @@
     {
       "id": "mil-air-conditioner-18kbtu",
       "file": "mil-air-conditioner-18kbtu.pdf",
-      "pages": "1-8,81-89",
+      "pages": "1-6,84-86",
       "category": "hvac",
       "brand": "US Army (Trane / Hottel / AAF)",
       "model": "18,000 BTU horizontal compact air conditioner (TM 5-4120-243-14)",
@@ -213,7 +213,7 @@
     {
       "id": "mil-water-heater-m80-m85",
       "file": "mil-water-heater-m80-m85.pdf",
-      "pages": "1-8,170-178",
+      "pages": "1-6,173-175",
       "category": "water heater",
       "brand": "US Army",
       "model": "M-80 / M-85 liquid-fuel water heater (TM 10-4520-259-13&P)",
@@ -224,7 +224,7 @@
     {
       "id": "mil-outboard-motor-omc-am40a",
       "file": "mil-outboard-motor-omc-am40a.pdf",
-      "pages": "1-8,103-111",
+      "pages": "1-6,106-108",
       "category": "outboard motor",
       "brand": "OMC (US Army)",
       "model": "AM-40A gasoline outboard motor (TM 5-2805-261-13)",
@@ -235,7 +235,7 @@
     {
       "id": "mil-forklift-electric-baker",
       "file": "mil-forklift-electric-baker.pdf",
-      "pages": "1-8,84-92",
+      "pages": "1-6,87-89",
       "category": "forklift",
       "brand": "Baker (US Army)",
       "model": "Electric solid-rubber-tire fork lift truck MHE (TM 10-3930-615-15)",
@@ -246,7 +246,7 @@
     {
       "id": "mil-arc-welder-sa135",
       "file": "mil-arc-welder-sa135.pdf",
-      "pages": "1-10",
+      "pages": "1-6",
       "category": "welder",
       "brand": "Westinghouse (US Army)",
       "model": "SA-135 inert-gas shielded arc welding set (TM 5-3431-200-15)",
@@ -279,7 +279,7 @@
     {
       "id": "epson-et2800-user-guide",
       "file": "epson-et2800-user-guide.pdf",
-      "pages": "1-8,122-130",
+      "pages": "1-6,125-127",
       "category": "printer",
       "brand": "Epson",
       "model": "EcoTank ET-2800 / ET-2803",
@@ -290,7 +290,7 @@
     {
       "id": "brother-hll2350dw-user-guide",
       "file": "brother-hll2350dw-user-guide.pdf",
-      "pages": "1-8,114-122",
+      "pages": "1-6,117-119",
       "category": "printer",
       "brand": "Brother",
       "model": "HL-L2350DW (also HL-L2325DW/L2370DW/L2390DW) laser printer",
@@ -301,7 +301,7 @@
     {
       "id": "toro-recycler-22-operator",
       "file": "toro-recycler-22-operator.pdf",
-      "pages": "all",
+      "pages": "1-6",
       "category": "lawn mower",
       "brand": "Toro",
       "model": "22in Recycler, models 20372/20374 (Form 3371-612)",
@@ -312,7 +312,7 @@
     {
       "id": "yamaha-rxv385-owners-manual",
       "file": "yamaha-rxv385-owners-manual.pdf",
-      "pages": "1-10",
+      "pages": "1-6",
       "category": "av receiver",
       "brand": "Yamaha",
       "model": "RX-V385 5.1ch AV receiver",
@@ -323,7 +323,7 @@
     {
       "id": "panasonic-nnsn686s-owners-manual",
       "file": "panasonic-nnsn686s-owners-manual.pdf",
-      "pages": "all",
+      "pages": "1-6",
       "category": "microwave",
       "brand": "Panasonic",
       "model": "NN-SN686S / NN-SN67HS inverter microwave",
@@ -334,7 +334,7 @@
     {
       "id": "avm-fritzbox-7590-manual",
       "file": "avm-fritzbox-7590-manual.pdf",
-      "pages": "1-8,154-162",
+      "pages": "1-6,157-159",
       "category": "router",
       "brand": "AVM",
       "model": "FRITZ!Box 7590 DSL router",
@@ -345,7 +345,7 @@
     {
       "id": "dji-mini2-user-manual",
       "file": "dji-mini2-user-manual.pdf",
-      "pages": "1-10",
+      "pages": "1-6",
       "category": "drone",
       "brand": "DJI",
       "model": "Mini 2",
@@ -356,7 +356,7 @@
     {
       "id": "prusa-i3-mk3s-handbook",
       "file": "prusa-i3-mk3s-handbook.pdf",
-      "pages": "1-10",
+      "pages": "1-6",
       "category": "3d printer",
       "brand": "Prusa Research",
       "model": "Original Prusa i3 MK3S",
@@ -367,7 +367,7 @@
     {
       "id": "canon-eos-rebel-t7-manual",
       "file": "canon-eos-rebel-t7-manual.pdf",
-      "pages": "1-8,159-167",
+      "pages": "1-6,162-164",
       "category": "camera",
       "brand": "Canon",
       "model": "EOS Rebel T7 / EOS 1500D",
@@ -378,7 +378,7 @@
     {
       "id": "brother-xm2701-operation-manual",
       "file": "brother-xm2701-operation-manual.pdf",
-      "pages": "1-10",
+      "pages": "1-6",
       "category": "sewing machine",
       "brand": "Brother",
       "model": "XM2701 mechanical sewing machine",
@@ -389,7 +389,7 @@
     {
       "id": "sram-1x-mtb-derailleur-manual",
       "file": "sram-1x-mtb-derailleur-manual.pdf",
-      "pages": "1-10",
+      "pages": "1-6",
       "category": "bicycle",
       "brand": "SRAM",
       "model": "1x MTB mechanical rear derailleurs (Eagle GX/X01/XX1, NX, SX)",
@@ -400,7 +400,7 @@
     {
       "id": "stihl-ms250-instruction-manual",
       "file": "stihl-ms250-instruction-manual.pdf",
-      "pages": "1-10",
+      "pages": "1-6",
       "category": "chainsaw",
       "brand": "Stihl",
       "model": "MS 250",
