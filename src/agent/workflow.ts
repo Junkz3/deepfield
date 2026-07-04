@@ -17,6 +17,8 @@ export interface WorkflowProfile {
   decisionMode: 'diagnosis' | 'answer';
   /** Physical-world tool phases (parts stock, measurements, safety notes) */
   physicalTools: boolean;
+  /** How ingestion should read category/brand/model for this vertical */
+  classifyHint: string;
 }
 
 export const PROFILES: Record<string, WorkflowProfile> = {
@@ -28,6 +30,7 @@ export const PROFILES: Record<string, WorkflowProfile> = {
     retrievalHint: 'error code table / troubleshooting first',
     decisionMode: 'diagnosis',
     physicalTools: true,
+    classifyHint: 'category = generic device type (e.g. "dishwasher"), brand = manufacturer, model = product reference',
   },
   insurance: {
     id: 'insurance',
@@ -37,6 +40,7 @@ export const PROFILES: Record<string, WorkflowProfile> = {
     retrievalHint: 'coverage tables, clauses, exclusions and warranty terms first',
     decisionMode: 'answer',
     physicalTools: false,
+    classifyHint: 'category = document type (e.g. "auto policy", "home policy", "claim form", "rider"), brand = insurer name, model = contract or product reference',
   },
   legal: {
     id: 'legal',
@@ -46,6 +50,7 @@ export const PROFILES: Record<string, WorkflowProfile> = {
     retrievalHint: 'definitions, obligations, liability clauses and referenced annexes first',
     decisionMode: 'answer',
     physicalTools: false,
+    classifyHint: 'category = document type (e.g. "contract", "judgment", "brief", "statute extract"), brand = issuing party or court, model = case or reference number',
   },
   generic: {
     id: 'generic',
@@ -55,6 +60,7 @@ export const PROFILES: Record<string, WorkflowProfile> = {
     retrievalHint: 'summary tables, procedures and reference sections first',
     decisionMode: 'answer',
     physicalTools: false,
+    classifyHint: 'category = document family, brand = issuing organization, model = document reference or title',
   },
 };
 

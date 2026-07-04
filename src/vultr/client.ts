@@ -204,7 +204,7 @@ ${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque val
   }
 
   async classify(input: ClassifyInput): Promise<DocMeta> {
-    const parts: unknown[] = [{ type: 'text', text: `Classify this repair document (filename: ${input.filename}). First pages attached. Return STRICT JSON: {"category": string (lowercase generic device type, e.g. "dishwasher"), "brand": string, "model": string, "docType": "service"|"user"|"schematic"|"parts", "pageKinds": []} Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.` }];
+    const parts: unknown[] = [{ type: 'text', text: `Classify this document (filename: ${input.filename}). First pages attached. ${workflowProfile().classifyHint}. Return STRICT JSON: {"category": string (lowercase), "brand": string, "model": string, "docType": "service"|"user"|"schematic"|"parts", "pageKinds": []} Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.` }];
     for (const img of input.pageImages.slice(0, 3)) parts.push({ type: 'image_url', image_url: { url: img } });
     const text = await chatText(this.t, MODELS.omni, parts, 6000);
     const meta = extractJson<DocMeta>(text, { category: 'uncategorized', brand: 'Unknown', model: 'Unknown', docType: 'user', pageKinds: [] });
