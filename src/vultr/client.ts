@@ -60,6 +60,8 @@ async function toDataUrl(imageUrl: string): Promise<string> {
 
 export class VultrDriver implements ModelDriver {
   constructor(private t: Transport) {}
+  private scopeHasSchematic = true; // updated on every retrieve
+
 
   async plan(q: { device: string; symptom: string; hasPhoto: boolean; userInput?: string }): Promise<PlanAction> {
     // The find-video action arrives as a raw token: turn it into real intent.
@@ -75,6 +77,7 @@ export class VultrDriver implements ModelDriver {
     // Video intent: frames carry weak visual signal against dense manual
     // pages (measured), but chapter TITLES rerank fast and precisely. So a
     // walkthrough query searches the video segments by title, text-only.
+    this.scopeHasSchematic = candidates.some((p) => p.kind === 'schematic');
     const wantsVideo = /video|walkthrough|demonstrat|tutorial/i.test(query);
     const segments = candidates.filter((p) => p.kind === 'video-segment');
     if (wantsVideo && segments.length > 0) {
@@ -97,11 +100,38 @@ export class VultrDriver implements ModelDriver {
       if (p.kind !== 'other') sc += 0.5; // curated key pages float up
       return sc;
     };
-    const budget = [...candidates]
-      .map((p, i) => ({ p, i, sc: lex(p) }))
-      .sort((a, b) => b.sc - a.sc || a.i - b.i)
-      .slice(0, BUDGET)
-      .map((x) => x.p);
+    // Per-document quota (round-robin): the lexical prefilter is English-only,
+    // so a Chinese or Spanish manual would never win a global top-24 on text
+    // score alone - but the visual rerank IS cross-lingual. Every doc in
+    // scope sends its best pages forward; no single manual hogs the budget.
+    const scored = candidates.map((p, i) => ({ p, i, sc: lex(p) }));
+    const byDoc = new Map<string, typeof scored>();
+    for (const s of scored) {
+      if (!byDoc.has(s.p.docId)) byDoc.set(s.p.docId, []);
+      byDoc.get(s.p.docId)!.push(s);
+    }
+    for (const [docId, list] of byDoc) {
+      list.sort((a, b) => b.sc - a.sc || a.i - b.i);
+      // Zero-score pages (non-English text, or a symptom the words miss) get
+      // sampled UNIFORMLY across the doc instead of "first pages win" - the
+      // visual rerank then sees a cross-section of the whole manual, not
+      // three covers and a table of contents.
+      const nz = list.filter((x) => x.sc > 0);
+      const z = list.filter((x) => x.sc <= 0);
+      if (z.length > 6) {
+        const stride = Math.ceil(z.length / 8);
+        byDoc.set(docId, [...nz, ...z.filter((_, idx) => idx % stride === 0)]);
+      }
+    }
+    const docLists = [...byDoc.values()].sort((a, b) => (b[0]?.sc ?? 0) - (a[0]?.sc ?? 0));
+    const budget: Page[] = [];
+    for (let k = 0; budget.length < BUDGET; k++) {
+      let took = false;
+      for (const list of docLists) {
+        if (k < list.length && budget.length < BUDGET) { budget.push(list[k].p); took = true; }
+      }
+      if (!took) break;
+    }
 
     // VERIFIED shape (docs/reference/vultr-api.md): documents = list of str | {content:[ONE part]}; top_n MUST be set.
     const documents = await Promise.all(budget.map(async (p) =>
@@ -118,7 +148,7 @@ export class VultrDriver implements ModelDriver {
       `p.${f.page.page} [${f.page.kind}]${f.page.title ? ` "${f.page.title}"` : ''} score=${f.score.toFixed(1)}${f.page.text ? `\n  text: "${f.page.text.slice(0, 400).replace(/\n+/g, ' ')}"` : ''}`,
     ).join('\n');
     const text = await chatText(this.t, MODELS.kimi,
-      `Repair diagnosis for ${q.device} - ${q.symptom}. Evidence retained so far:\n${listing}\nIMPORTANT: retrieval scored the page IMAGES; a page holds more than its text snippet. A page tagged [error-table] almost certainly contains the full error-code table even if the snippet cuts off before the code; a page tagged [schematic] IS a wiring/schematic page. To point at a component you need BOTH the fault identification AND a wiring/schematic page. Return STRICT JSON: {"sufficient": boolean, "reason": string, "followupQuery": string|null} - reason written in ${AGENT_LANG}; followupQuery = 3-8 plain English search KEYWORDS (e.g. "heating circuit wiring diagram"), NEVER a sentence or an instruction.`, 8000);
+      `Repair diagnosis for ${q.device} - ${q.symptom}. Evidence retained so far:\n${listing}\nIMPORTANT: retrieval scored the page IMAGES; a page holds more than its text snippet. A page tagged [error-table] almost certainly contains the full error-code table even if the snippet cuts off before the code; a page tagged [schematic] IS a wiring/schematic page. ${this.scopeHasSchematic ? 'To point at a component you need BOTH the fault identification AND a wiring/schematic page.' : 'The scope contains NO schematic pages at all (user-guide material): a troubleshooting or diagnostic-procedure page is then SUFFICIENT - never demand a wiring diagram that does not exist here.'} Return STRICT JSON: {"sufficient": boolean, "reason": string, "followupQuery": string|null} - reason written in ${AGENT_LANG}; followupQuery = 3-8 plain English search KEYWORDS (e.g. "heating circuit wiring diagram"), NEVER a sentence or an instruction.`, 8000);
     const v = extractJson(text, { sufficient: true, reason: 'assessment unavailable', followupQuery: null as string | null });
     return { sufficient: v.sufficient, reason: v.reason, followupQuery: v.followupQuery ?? undefined };
   }
@@ -127,8 +157,17 @@ export class VultrDriver implements ModelDriver {
     const parts: unknown[] = [{ type: 'text', text: `You are a repair diagnosis agent. Device: ${q.device}. Symptom: ${q.symptom}.\nGround yourself ONLY in the attached manual pages${techPhoto ? ' and the technician photo (last image)' : ''}. Return STRICT JSON: {"component": string, "cause": string, "checks": [string, string, string], "instruction": string, "componentKey": "heater"|"thermistor"|"sensor"|"pump"|"motor"|"board"|"wiring"|"other"} - checks must be concrete ACTIONS the technician performs (measure X, inspect Y), ordered, with measurable values when the pages give them; instruction = one or two sentences guiding the technician: the FIRST concrete action with its expected measurable value from the pages, then what the result decides next; varied phrasing, no boilerplate prefix. Write component/cause/checks in ${AGENT_LANG}; keep part numbers and error codes verbatim. If the pages do not support a diagnosis, set component to "insufficient evidence". Do not deliberate at length: keep any internal reasoning under 100 words, then output ONLY the JSON object.` }];
     for (const p of evidence.slice(0, 4)) parts.push({ type: 'image_url', image_url: { url: await toDataUrl(p.imageUrl) } });
     if (techPhoto) parts.push({ type: 'image_url', image_url: { url: techPhoto } });
+    const fallback: Diagnosis = {
+      component: 'insufficient evidence',
+      cause: 'The retrieved pages did not yield a grounded diagnosis.',
+      checks: ['Describe the symptom more specifically', 'Open the cited pages and check them manually'],
+    };
     const text = await chatText(this.t, MODELS.omni, parts, 8000);
-    return extractJson<Diagnosis>(text, { component: 'insufficient evidence', cause: 'Model response unparseable', checks: ['Retry the diagnosis'] });
+    const first = extractJson<Diagnosis>(text, fallback);
+    if (first !== fallback) return first;
+    // One silent retry: dense or off-topic pages sometimes burn the budget.
+    const retry = await chatText(this.t, MODELS.omni, parts, 8000);
+    return extractJson<Diagnosis>(retry, fallback);
   }
 
   async classify(input: ClassifyInput): Promise<DocMeta> {

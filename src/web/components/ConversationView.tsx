@@ -26,6 +26,8 @@ function ConfidenceMeter({ value, reason }: { value: number; reason: string }) {
 
 function CiteChips({ citations, onOpen }: { citations: Citation[]; onOpen: (c: Citation) => void }) {
   if (citations.length === 0) return null;
+  // Several documents cited in one step: name each chip's source doc.
+  const multiDoc = new Set(citations.map((c) => c.docId)).size > 1;
   return (
     <div className="cite-chips">
       {citations.map((c, i) => (
@@ -35,7 +37,10 @@ function CiteChips({ citations, onOpen }: { citations: Citation[]; onOpen: (c: C
               ? `@ ${Math.floor(c.timestamp / 60)}:${String(c.timestamp % 60).padStart(2, '0')}`
               : `p.${c.page}`}
           </span>
-          <span className="cite-chip-title">{c.title ?? c.label}</span>
+          <span className="cite-chip-title">
+            {multiDoc ? `${c.docId.split('-').slice(0, 2).join(' ')} · ` : ''}
+            {c.title ?? c.label}
+          </span>
         </button>
       ))}
     </div>

@@ -121,6 +121,21 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   const diagnosis = await driver.diagnose(q, retrieved.map((r) => r.page), conversation.attachments[0]?.dataUrl);
   yield emit({ phase: 'reason', summary: `Likely fault: ${diagnosis.component}`, detail: diagnosis.cause });
 
+  // The model refusing to invent IS a feature: when the pages truly do not
+  // support a diagnosis (index pages pointing at procedures not in the KB),
+  // deliver an honest no-evidence step - no phantom parts, no 'undefined'.
+  if (/insufficient|insuffisan/i.test(diagnosis.component) || diagnosis.checks.length === 0) {
+    const conf = computeConfidence({ exactCodeMatch: false, corroboratingCitations: 0, requiredPageMissing: true });
+    yield emit({ phase: 'decide', summary: 'The retrieved pages do not support a grounded diagnosis' });
+    return {
+      index: conversation.steps.length, phaseEvents: events,
+      instruction: `The pages found (see citations) reference procedures that are not in the knowledge base yet. Upload the full service manual for "${conversation.device}", or open the cited index pages to locate the paper procedure.`,
+      citations: retrieved.map(toCitation),
+      proposedNext: [{ label: 'Upload the full manual', action: 'open-ingest' }],
+      confidence: conf.value, confidenceReason: conf.reason, status: 'no-evidence',
+    };
+  }
+
   // TOOLS
   yield emit({ phase: 'tools', summary: 'Checking parts and safety' });
   // Part lookup by machine key; devices without a catalog entry get an honest

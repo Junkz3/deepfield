@@ -173,8 +173,9 @@ function makeBoltLine(color: string, opacity: number): THREE.Line {
   return line;
 }
 
-/** One crackling bolt from the core to a target. Three superimposed jittered
- *  passes (white core, colored sheath, wide halo) regenerate ~14x/s. */
+/** One crackling bolt from the core to a target. A single jittered master
+ *  path regenerates ~14x/s; the three passes (white core, colored sheath,
+ *  wide halo) all hug it so they read as ONE bolt with a glow. */
 function LightningBolt({ to, color, interval = 0.07 }: { to: THREE.Vector3; color: string; interval?: number }) {
   const lines = useMemo(
     () => [makeBoltLine('#ffffff', 0.95), makeBoltLine(color, 0.55), makeBoltLine(color, 0.22)],
@@ -193,14 +194,21 @@ function LightningBolt({ to, color, interval = 0.07 }: { to: THREE.Vector3; colo
     if (p1.lengthSq() < 1e-4) p1.set(1, 0, 0);
     p1.normalize();
     const p2 = new THREE.Vector3().crossVectors(dir, p1);
-    const spread = [0.035, 0.06, 0.1];
+    const mA = new Float32Array(BOLT_PTS + 1);
+    const mB = new Float32Array(BOLT_PTS + 1);
+    for (let i = 0; i <= BOLT_PTS; i++) {
+      const env = Math.sin((i / BOLT_PTS) * Math.PI) * len * 0.05;
+      mA[i] = (Math.random() - 0.5) * 2 * env;
+      mB[i] = (Math.random() - 0.5) * 2 * env;
+    }
+    const fuzz = [0, 0.012, 0.03];
     lines.forEach((line, li) => {
       const pos = line.geometry.getAttribute('position') as THREE.BufferAttribute;
       for (let i = 0; i <= BOLT_PTS; i++) {
         const t = i / BOLT_PTS;
-        const env = Math.sin(t * Math.PI) * len * spread[li];
-        const a = (Math.random() - 0.5) * 2 * env;
-        const b = (Math.random() - 0.5) * 2 * env;
+        const f = Math.sin(t * Math.PI) * len * fuzz[li];
+        const a = mA[i] + (Math.random() - 0.5) * 2 * f;
+        const b = mB[i] + (Math.random() - 0.5) * 2 * f;
         pos.setXYZ(i,
           to.x * t + p1.x * a + p2.x * b,
           to.y * t + p1.y * a + p2.y * b,
@@ -213,10 +221,11 @@ function LightningBolt({ to, color, interval = 0.07 }: { to: THREE.Vector3; colo
   return <group>{lines.map((l, i) => <primitive key={i} object={l} />)}</group>;
 }
 
-/** While the agent scans, 4-5 bolts probe random in-scope files, retargeting
- *  fast — the plasma globe reaching for fingers. */
+/** While the agent scans, a few bolts probe in-scope files, retargeting
+ *  fast — the plasma globe reaching for fingers. Each bolt strikes a
+ *  distinct file: never two bolts on the same target. */
 function ScanStorm({ targets }: { targets: { pos: THREE.Vector3; color: string }[] }) {
-  const SLOTS = Math.min(5, Math.max(2, targets.length));
+  const SLOTS = Math.min(5, targets.length);
   const [picks, setPicks] = useState<number[]>([]);
   const swapAt = useRef<number[]>([]);
 
@@ -226,7 +235,9 @@ function ScanStorm({ targets }: { targets: { pos: THREE.Vector3; color: string }
     const next = [...picks];
     for (let sIdx = 0; sIdx < SLOTS; sIdx++) {
       if (swapAt.current[sIdx] === undefined || t >= swapAt.current[sIdx]) {
-        next[sIdx] = Math.floor(Math.random() * targets.length);
+        const used = new Set(next.filter((_, i) => i !== sIdx));
+        const free = targets.map((_, i) => i).filter((i) => !used.has(i));
+        if (free.length > 0) next[sIdx] = free[Math.floor(Math.random() * free.length)];
         swapAt.current[sIdx] = t + 0.16 + Math.random() * 0.28;
         changed = true;
       }
@@ -786,14 +797,13 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage }: {
       ))}
 
       {state.scanning && (
-        <ScanStorm targets={nodes.filter((n) => inScope(n.doc.id)).map((n) => ({ pos: livePos(n), color: n.color }))} />
+        <ScanStorm targets={nodes.filter((n) => inScope(n.doc.id) && !hitByDoc.has(n.doc.id)).map((n) => ({ pos: livePos(n), color: n.color }))} />
       )}
 
       {state.ingesting && (
         <group>
           <IngestEmbryo />
           <LightningBolt to={EMBRYO_POS} color="#ffd9a0" interval={0.05} />
-          <LightningBolt to={EMBRYO_POS} color="#59c2ff" interval={0.09} />
         </group>
       )}
 
