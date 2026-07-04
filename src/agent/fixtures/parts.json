@@ -1,0 +1,6 @@
+{
+  "W10518394": { "name": "Heating element", "inStock": true, "price": 42, "leadDays": 0 },
+  "WPW10352973": { "name": "Thermistor / OWI sensor", "inStock": true, "price": 18, "leadDays": 0 },
+  "W10130694": { "name": "Door latch assembly", "inStock": false, "price": 61, "leadDays": 3 },
+  "12472568": { "name": "4L80-E TCM harness connector", "inStock": true, "price": 27, "leadDays": 1 }
+}

@@ -1,0 +1,4 @@
+{
+  "heating element": { "minOhms": 15, "maxOhms": 30, "suggestNext": "thermistor" },
+  "thermistor": { "minOhms": 48000, "maxOhms": 55000, "suggestNext": "control board" }
+}
