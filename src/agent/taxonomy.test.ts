@@ -38,9 +38,18 @@ describe('mergeDocs', () => {
 });
 
 describe('candidatePages', () => {
-  it('scopes by device query tokens', () => {
+  it('scopes to the BEST-matching docs, not every token hit', () => {
     const pages = candidatePages(CORPUS, 'Whirlpool dishwasher');
+    expect(new Set(pages.map((p) => p.docId))).toEqual(new Set(['whirlpool-dw']));
+  });
+  it('a generic query keeps every doc of the tied category', () => {
+    const pages = candidatePages(CORPUS, 'dishwasher');
     expect(new Set(pages.map((p) => p.docId))).toEqual(new Set(['whirlpool-dw', 'lg-dw']));
+  });
+  it('a shared noun does not pull in another appliance', () => {
+    const corpus = [...CORPUS, doc('brother-sew', 'sewing machine', 'Brother', 'XM2701'), doc('lg-wash', 'washing machine', 'LG', 'WM3400')];
+    const pages = candidatePages(corpus, 'Brother XM2701 sewing machine');
+    expect(new Set(pages.map((p) => p.docId))).toEqual(new Set(['brother-sew']));
   });
   it('never returns a silently empty scope', () => {
     expect(candidatePages(CORPUS, 'zzz unknown').length).toBe(7);
@@ -65,7 +74,7 @@ describe('scopeDocIds (contextual recursion)', () => {
   it('scopes to matching docs and shares truth with candidatePages', async () => {
     const { scopeDocIds } = await import('./taxonomy');
     const ids = scopeDocIds(CORPUS, 'Whirlpool dishwasher');
-    expect(ids).toEqual(new Set(['whirlpool-dw', 'lg-dw']));
+    expect(ids).toEqual(new Set(['whirlpool-dw']));
     expect(scopeDocIds(CORPUS, 'zzz unknown').size).toBe(3);
   });
 });

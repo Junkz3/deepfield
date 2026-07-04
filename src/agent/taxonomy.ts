@@ -50,10 +50,16 @@ export function mergeDocs(corpus: Document[], session: Document[]): Document[] {
  *  agent loop AND the universe rendering share (contextual recursion). */
 export function scopeDocIds(docs: Document[], deviceQuery: string): Set<string> {
   const tokens = deviceQuery.toLowerCase().split(/\s+/).filter(Boolean);
-  const matches = docs.filter((d) =>
-    tokens.some((t) => [d.category, d.brand, d.model].some((f) => f.toLowerCase().includes(t))),
-  );
-  const scope = matches.length > 0 ? matches : docs;
+  // Score = matched token count, keep only the best-matching docs. A binary
+  // OR let "sewing machine" pull the washing-machine manual in via "machine".
+  let best = 0;
+  const scored = docs.map((d) => {
+    const hay = [d.category, d.brand, d.model].map((f) => f.toLowerCase());
+    const score = tokens.filter((t) => hay.some((f) => f.includes(t))).length;
+    if (score > best) best = score;
+    return { d, score };
+  });
+  const scope = best > 0 ? scored.filter((s) => s.score === best).map((s) => s.d) : docs;
   return new Set(scope.map((d) => d.id));
 }
 
