@@ -214,3 +214,11 @@
   letter-spacing: 0.12em;
   font-size: var(--fs-sm);
 }
+
+.galaxy-add {
+  position: absolute;
+  top: var(--sp-4);
+  left: 150px;
+  z-index: 20;
+  cursor: pointer;
+}

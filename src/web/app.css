@@ -40,3 +40,42 @@
   font-weight: 650;
   color: var(--text);
 }
+
+/* ---- Live ingest: drop onto the universe ---- */
+
+.drop-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 11, 16, 0.55);
+  backdrop-filter: blur(3px);
+  pointer-events: none;
+}
+.drop-veil-inner {
+  padding: var(--sp-4) var(--sp-6);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-lg);
+  color: var(--accent-strong);
+  font-size: var(--fs-md);
+  letter-spacing: 0.08em;
+  background: rgba(255, 180, 84, 0.06);
+  box-shadow: 0 0 40px rgba(255, 180, 84, 0.15);
+}
+
+.ingest-toast {
+  position: absolute;
+  top: var(--sp-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 41;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: rgba(15, 21, 28, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line-strong);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.05em;
+}
