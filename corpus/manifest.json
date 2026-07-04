@@ -18,6 +18,9 @@
         "40": "procedure", "41": "procedure", "42": "procedure", "43": "procedure",
         "44": "procedure", "45": "procedure", "46": "procedure", "47": "procedure",
         "48": "procedure", "49": "procedure", "50": "procedure"
+      },
+      "regions": {
+        "18": { "x": 0.06, "y": 0.62, "w": 0.85, "h": 0.066 }
       }
     },
     {

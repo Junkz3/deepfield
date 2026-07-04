@@ -6,9 +6,9 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildTaxonomy } from '../src/agent/taxonomy';
-import type { Document, Page, PageKind } from '../src/agent/types';
+import type { Document, Page, PageKind, Region } from '../src/agent/types';
 
-interface ManifestDoc { id: string; file: string; pages: string; category: string; brand: string; model: string; docType: Document['docType']; sourceRights: string; kinds: Record<string, PageKind> }
+interface ManifestDoc { id: string; file: string; pages: string; category: string; brand: string; model: string; docType: Document['docType']; sourceRights: string; kinds: Record<string, PageKind>; regions?: Record<string, Region> }
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const SRC = join(ROOT, 'corpus/src');
@@ -48,6 +48,7 @@ for (const m of manifest.docs) {
       docId: m.id, page: p, imageUrl: `/corpus/${m.id}/p${p}.png`,
       text: text.slice(0, 600) || undefined,
       kind: m.kinds[String(p)] ?? 'other',
+      region: m.regions?.[String(p)],
     });
     process.stdout.write(`\r${m.id}: p${p}/${pages[pages.length - 1]}   `);
   }
@@ -56,6 +57,16 @@ for (const m of manifest.docs) {
 }
 
 mkdirSync(OUT, { recursive: true });
-writeFileSync(join(OUT, 'docs.json'), JSON.stringify(docs));
-writeFileSync(join(OUT, 'taxonomy.json'), JSON.stringify(buildTaxonomy(docs)));
-console.log(`Wrote ${docs.length} docs, ${docs.reduce((a, d) => a + d.pages.length, 0)} pages -> public/corpus/`);
+// Single-doc runs must merge into the existing docs.json, not replace it.
+let allDocs = docs;
+if (only) {
+  const existingPath = join(OUT, 'docs.json');
+  const existing: Document[] = existsSync(existingPath) ? JSON.parse(readFileSync(existingPath, 'utf8')) : [];
+  const manifestOrder = manifest.docs.map((m) => m.id);
+  const byId = new Map(existing.map((d) => [d.id, d]));
+  for (const d of docs) byId.set(d.id, d);
+  allDocs = [...byId.values()].sort((a, b) => manifestOrder.indexOf(a.id) - manifestOrder.indexOf(b.id));
+}
+writeFileSync(join(OUT, 'docs.json'), JSON.stringify(allDocs));
+writeFileSync(join(OUT, 'taxonomy.json'), JSON.stringify(buildTaxonomy(allDocs)));
+console.log(`Wrote ${allDocs.length} docs, ${allDocs.reduce((a, d) => a + d.pages.length, 0)} pages -> public/corpus/`);
