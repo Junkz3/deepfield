@@ -79,6 +79,16 @@
 }
 .step-index { font-size: var(--fs-xs); color: var(--text-faint); letter-spacing: 0.12em; }
 .step-status { font-size: var(--fs-xs); letter-spacing: 0.08em; }
+.step-agent {
+  font-size: var(--fs-xs);
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  padding: 1px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  margin-left: auto;
+  margin-right: var(--sp-2);
+}
 
 .live-chip { display: inline-flex; align-items: center; gap: 7px; color: var(--accent); }
 .live-dot {

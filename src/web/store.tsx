@@ -5,6 +5,9 @@ import { createContext, useContext, useEffect, useMemo, useReducer } from 'react
 import type { ReactNode } from 'react';
 import type { Attachment, Conversation, Document, GuidedStep } from '../agent/types';
 import { mergeDocs } from '../agent/taxonomy';
+import { presetTeam } from '../agent/team';
+import type { AgentSpec } from '../agent/workflow';
+import { setWorkflowTeam } from '../agent/workflow';
 import { setAgentLanguage } from '../vultr/client';
 
 export type DriverKind = 'fake' | 'vultr';
@@ -48,6 +51,8 @@ export interface AppState {
   lastBorn: string | null;
   /** technician language: retrieval is multilingual, the agent answers in it */
   lang: Lang;
+  /** the workspace agent team; the user toggles who is active per request */
+  team: AgentSpec[];
 }
 
 export type Action =
@@ -66,6 +71,8 @@ export type Action =
   | { type: 'ingest-start'; name: string }
   | { type: 'ingest-done'; docId: string | null }
   | { type: 'set-lang'; lang: Lang }
+  | { type: 'set-team'; team: AgentSpec[] }
+  | { type: 'toggle-agent'; id: string }
   | { type: 'demo-reset' };
 
 const LS_KEY = 'rc.conversations';
@@ -97,6 +104,7 @@ export const initialState: AppState = {
   ingesting: null,
   lastBorn: null,
   lang: (localStorage.getItem('rc.lang') as Lang) || 'en',
+  team: presetTeam('repair'),
 };
 
 export function reducer(state: AppState, a: Action): AppState {
@@ -151,6 +159,14 @@ export function reducer(state: AppState, a: Action): AppState {
     case 'set-lang':
       localStorage.setItem('rc.lang', a.lang);
       return { ...state, lang: a.lang };
+    case 'set-team':
+      return { ...state, team: a.team };
+    case 'toggle-agent': {
+      // At least one agent must stay active: the router needs someone to
+      // hand the request to.
+      const next = state.team.map((t) => (t.id === a.id ? { ...t, active: !t.active } : t));
+      return next.some((t) => t.active) ? { ...state, team: next } : state;
+    }
     case 'demo-reset':
       localStorage.removeItem(LS_KEY);
       return {
@@ -163,6 +179,7 @@ export function reducer(state: AppState, a: Action): AppState {
         lightbox: null,
         ingesting: null,
         lastBorn: null,
+        team: presetTeam('repair'),
       };
     default:
       return state;
@@ -185,6 +202,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setAgentLanguage(langName(state.lang));
   }, [state.lang]);
+
+  // The engine routes between whatever agents the user left enabled.
+  useEffect(() => {
+    setWorkflowTeam(state.team);
+  }, [state.team]);
 
   // Boot: load the build-time corpus (absent in early dev = empty galaxy, fine).
   useEffect(() => {

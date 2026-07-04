@@ -2,6 +2,7 @@
 // One free-form input: ask the agent anything; it searches the universe.
 import { useRef, useState } from 'react';
 import type { Attachment } from '../../agent/types';
+import { AgentDock } from './AgentDock';
 import { VoiceInput } from './VoiceInput';
 import { useApp } from '../store';
 
@@ -49,6 +50,7 @@ export function CommandBar() {
 
   return (
     <div className="cmdbar-zone">
+      <AgentDock />
       <div className="cmdbar-presets">
         {PRESETS.map((p) => (
           <button key={p.label} className="cmdbar-preset mono" onClick={() => launch(p.device, p.symptom)}>

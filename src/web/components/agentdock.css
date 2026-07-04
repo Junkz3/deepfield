@@ -1,0 +1,73 @@
+.agent-dock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.agent-dock-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim, rgba(255, 255, 255, 0.45));
+}
+
+.agent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text, rgba(255, 255, 255, 0.85));
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+}
+
+.agent-chip:disabled {
+  cursor: default;
+}
+
+.agent-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok, #3ddc97);
+  box-shadow: 0 0 6px var(--ok, #3ddc97);
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.agent-chip.on {
+  border-color: rgba(99, 211, 222, 0.45);
+  background: rgba(99, 211, 222, 0.08);
+}
+
+.agent-chip.off {
+  opacity: 0.5;
+}
+
+.agent-chip.off .agent-chip-dot {
+  background: rgba(255, 255, 255, 0.25);
+  box-shadow: none;
+}
+
+.agent-dock.compact .agent-chip {
+  padding: 3px 10px;
+  font-size: 11px;
+}
+
+.agent-dock.compact .agent-dock-label {
+  font-size: 9px;
+}
+
+/* Inside a conversation the dock sits between the stream and the reply box. */
+.conv .agent-dock {
+  padding: var(--sp-2) var(--sp-4) 0;
+}
+
+/* Over the universe it floats inside the command bar zone. */
+.cmdbar-zone .agent-dock {
+  justify-content: center;
+}

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Citation, GuidedStep } from '../../agent/types';
 import { useStepRunner } from '../hooks/useStepRunner';
 import { useApp } from '../store';
+import { AgentDock } from './AgentDock';
 import { Timeline } from './Timeline';
 import { WorkOrderView } from './WorkOrderView';
 import './conversation.css';
@@ -84,6 +85,7 @@ function StepCard({ step, isLast, onAction, onOpenCite, onOpenPage }: {
     <article className={`step-card panel fade-up ${step.status}`}>
       <header className="step-head">
         <span className="step-index mono">STEP {step.index + 1}</span>
+        {step.agentLabel && <span className="step-agent mono">via {step.agentLabel}</span>}
         <span className="step-status mono" style={{ color: statusColor }}>{step.status.toUpperCase()}</span>
       </header>
       <Timeline events={step.phaseEvents} running={false} onOpenPage={onOpenPage} />
@@ -197,6 +199,8 @@ export function ConversationView({ id }: { id: string }) {
           </article>
         )}
       </div>
+
+      <AgentDock compact />
 
       <FreeReply disabled={live.running} onSend={(text) => void run(text)} />
 
