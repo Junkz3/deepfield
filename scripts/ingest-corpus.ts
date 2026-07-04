@@ -48,15 +48,15 @@ function extractTextBlocks(pdf: string, pageNum: number): TextBlock[] {
     }
   }
   // lines -> blocks (vertical gap below 0.9 line height merges)
-  const blocks: { x1: number; y1: number; x2: number; y2: number; t: string }[] = [];
+  const blocks: { x1: number; y1: number; x2: number; y2: number; t: string; n: number }[] = [];
   for (const l of lines) {
     const last = blocks[blocks.length - 1];
     const lh = l.y2 - l.y1;
     if (last && l.y1 - last.y2 < lh * 0.9 && l.x1 < last.x2 + 20 && l.x2 > last.x1 - 20) {
       last.x1 = Math.min(last.x1, l.x1); last.x2 = Math.max(last.x2, l.x2);
-      last.y2 = Math.max(last.y2, l.y2); last.t += `\n${l.t}`;
+      last.y2 = Math.max(last.y2, l.y2); last.t += `\n${l.t}`; last.n += 1;
     } else {
-      blocks.push({ ...l });
+      blocks.push({ ...l, n: 1 });
     }
   }
   return blocks
@@ -67,6 +67,7 @@ function extractTextBlocks(pdf: string, pageNum: number): TextBlock[] {
       y: +(b.y1 / H).toFixed(4),
       w: +((b.x2 - b.x1) / W).toFixed(4),
       h: +((b.y2 - b.y1) / H).toFixed(4),
+      lines: b.n,
       text: b.t.replace(/\s+/g, ' ').trim().slice(0, 500),
     }));
 }

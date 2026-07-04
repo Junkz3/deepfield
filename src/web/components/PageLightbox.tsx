@@ -8,6 +8,39 @@ import { langName, useApp } from '../store';
 import { translateLines, translatePage, translateTextLayer } from '../translate';
 import type { TextBlock } from '../../agent/types';
 
+interface PatchStyle { bg: string; fg: string }
+
+/** Sample the page background around each block so patches melt into the
+ *  design: only the words change, not the look. */
+function samplePatchStyles(img: HTMLImageElement, blocks: TextBlock[]): PatchStyle[] {
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const g = canvas.getContext('2d');
+  if (!g) return blocks.map(() => ({ bg: 'rgba(252,252,250,0.97)', fg: '#17202b' }));
+  g.drawImage(img, 0, 0);
+  const W = canvas.width, H = canvas.height;
+  return blocks.map((b) => {
+    const pts: [number, number][] = [];
+    const x0 = b.x * W, y0 = b.y * H, w = b.w * W, h = b.h * H;
+    for (let i = 0; i < 6; i++) {
+      pts.push([x0 + (w * i) / 5, Math.max(0, y0 - 4)]);          // just above
+      pts.push([x0 + (w * i) / 5, Math.min(H - 1, y0 + h + 4)]);  // just below
+    }
+    let r = 0, gr = 0, bl = 0, n = 0;
+    for (const [px, py] of pts) {
+      try {
+        const d = g.getImageData(Math.round(px), Math.round(py), 1, 1).data;
+        r += d[0]; gr += d[1]; bl += d[2]; n++;
+      } catch { /* ignore */ }
+    }
+    if (n === 0) return { bg: 'rgba(252,252,250,0.97)', fg: '#17202b' };
+    r = Math.round(r / n); gr = Math.round(gr / n); bl = Math.round(bl / n);
+    const lum = 0.2126 * r + 0.7152 * gr + 0.0722 * bl;
+    return { bg: `rgb(${r}, ${gr}, ${bl})`, fg: lum > 140 ? '#17202b' : '#f2f5f8' };
+  });
+}
+
 export function PageLightbox() {
   const { state, dispatch, docs } = useApp();
   const lb = state.lightbox;
@@ -18,6 +51,7 @@ export function PageLightbox() {
   const [chapterLines, setChapterLines] = useState<string[] | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const [imgH, setImgH] = useState(600);
+  const [patchStyles, setPatchStyles] = useState<PatchStyle[]>([]);
 
   const doc = lb ? docs.find((d) => d.id === lb.docId) : undefined;
   const idx = doc ? Math.max(0, doc.pages.findIndex((p) => p.page === lb!.page)) : 0;
@@ -71,6 +105,7 @@ export function PageLightbox() {
           state.driverKind,
         );
         setBlocks(page.textBlocks.map((b, i) => ({ ...b, text: translated[i] ?? b.text })));
+        if (imgRef.current?.complete) setPatchStyles(samplePatchStyles(imgRef.current, page.textBlocks));
         setShowTranslated(true);
       } else if (page.textBlocks && page.textBlocks.length > 0) {
         // Dense layout, but a text layer exists: reliable text-only pane via Kimi.
@@ -126,7 +161,14 @@ export function PageLightbox() {
               alt={`${doc.model} page ${page.page}`}
               onLoad={() => imgRef.current && setImgH(imgRef.current.clientHeight)}
             />
-            {blocks && showTranslated && blocks.map((b, i) => (
+            {blocks && showTranslated && (() => {
+              const lineHeights = blocks.map((bb) => (bb.h * imgH) / (bb.lines ?? 1)).sort((a, z) => a - z);
+              const median = lineHeights[Math.floor(lineHeights.length / 2)] || 14;
+              return blocks.map((b, i) => {
+                const lh = (b.h * imgH) / (b.lines ?? 1);
+                const centered = Math.abs(b.x + b.w / 2 - 0.5) < 0.06 && b.x > 0.12;
+                const st = patchStyles[i];
+                return (
               <span
                 key={i}
                 className="tl-patch"
@@ -135,12 +177,22 @@ export function PageLightbox() {
                   top: `${b.y * 100}%`,
                   width: `${b.w * 100}%`,
                   minHeight: `${b.h * 100}%`,
-                  fontSize: `${Math.max(8, Math.min(20, Math.round(b.h * imgH * 0.34)))}px`,
+                  maxHeight: `${b.h * 170}%`,
+                  // the ORIGINAL line height sets the type size: only the
+                  // words change, not the look
+                  fontSize: `${Math.max(7, Math.min(26, Math.round(lh * 0.72)))}px`,
+                  fontWeight: (b.lines ?? 1) <= 2 && lh > median * 1.6 ? 650 : 400,
+                  textAlign: centered ? 'center' : 'left',
+                  background: st?.bg ?? 'rgba(252,252,250,0.97)',
+                  color: st?.fg ?? '#17202b',
+                  boxShadow: `0 0 0 3px ${st?.bg ?? 'rgba(252,252,250,0.97)'}`,
                 }}
               >
                 {b.text}
               </span>
-            ))}
+                );
+              });
+            })()}
             {page.region && (
               <span
                 className="cite-region strong"
