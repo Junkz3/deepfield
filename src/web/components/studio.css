@@ -35,13 +35,11 @@
   margin-bottom: var(--sp-5);
 }
 
-.studio-mark {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 24px var(--accent-glow), 0 0 64px var(--accent-dim);
+/* The galaxy glyph, enlarged: same mark as the sidebar, now the Deepfield logo. */
+.studio-mark-glyph {
+  display: flex;
+  justify-content: center;
+  filter: drop-shadow(0 0 18px var(--accent-glow));
 }
 
 .studio-title {
@@ -364,11 +362,3 @@
   transition: border-color var(--t-fast), color var(--t-fast);
 }
 .studio-close:hover { border-color: var(--accent); color: var(--fg0); }
-
-/* Nova idles between the card and the footer, part of the same fade. */
-.studio-nova {
-  display: flex;
-  justify-content: center;
-  margin-top: var(--sp-4);
-  opacity: 0.9;
-}

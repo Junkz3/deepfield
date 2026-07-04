@@ -4,10 +4,11 @@ import { setAgentLanguage } from '../../vultr/client';
 import { setWorkflowProfile } from '../../agent/workflow';
 import './sidebar.css';
 
-/** Galaxy glyph: the agent sun + two orbiting docs, pure SVG, no emoji. */
-function GalaxyGlyph() {
+/** Galaxy glyph: the agent sun + two orbiting docs, pure SVG, no emoji.
+ *  Doubles as the Deepfield logo (Studio header uses it enlarged). */
+export function GalaxyGlyph({ size = 18 }: { size?: number }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
+    <svg width={size} height={size} viewBox="0 0 18 18" aria-hidden>
       <circle cx="9" cy="9" r="2.6" fill="var(--accent)" />
       <circle cx="9" cy="9" r="6.4" fill="none" stroke="var(--line-strong)" strokeWidth="1" />
       <circle cx="14.6" cy="6.2" r="1.4" fill="var(--info)" />
@@ -23,7 +24,9 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <span className="sidebar-brand-mark" />
+        <span className="sidebar-brand-mark" aria-hidden>
+          <GalaxyGlyph size={22} />
+        </span>
         <span className="sidebar-brand-text">
           {state.workspaceName}
           <span className="sidebar-brand-sub">built on Deepfield</span>

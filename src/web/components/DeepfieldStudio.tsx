@@ -10,7 +10,7 @@ import { setWorkflowProfile } from '../../agent/workflow';
 import { getDriver } from '../driver-factory';
 import { initialDriverKind, LANGS, useApp } from '../store';
 import { splitSeedFiles } from '../studio';
-import { Mascot } from './Mascot';
+import { GalaxyGlyph } from './Sidebar';
 import './studio.css';
 
 /** Deepfield Studio: the workspace creation screen shown before boot (?studio).
@@ -179,7 +179,9 @@ export function DeepfieldStudio({ onCreate, onClose }: Props) {
     <div className={`studio ${closing ? 'closing' : ''}`}>
       <div className="studio-col">
         <header className="studio-head fade-up">
-          <span className="studio-mark" />
+          <div className="studio-mark-glyph" aria-hidden>
+            <GalaxyGlyph size={52} />
+          </div>
           <h1 className="studio-title">Deepfield</h1>
           <p className="studio-tagline">
             Drop any document corpus in, get a cited agent workspace out.
@@ -349,10 +351,6 @@ export function DeepfieldStudio({ onCreate, onClose }: Props) {
             </div>
           )}
         </section>
-
-        <div className="studio-nova fade-up" aria-hidden>
-          <Mascot mood="idle" size={64} />
-        </div>
 
         <footer className="studio-foot mono fade-up">
           deepfield · the document-universe engine

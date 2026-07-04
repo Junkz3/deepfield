@@ -18,12 +18,11 @@
   letter-spacing: 0.01em;
 }
 
+/* The galaxy glyph as the brand mark, same logo as the Studio header. */
 .sidebar-brand-mark {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 12px var(--accent-glow);
+  display: flex;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 8px var(--accent-glow));
 }
 
 .sidebar-brand-text {
