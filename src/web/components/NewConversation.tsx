@@ -32,6 +32,18 @@ export function NewConversation() {
     });
   };
 
+  const [ask, setAsk] = useState('');
+  const askUniverse = () => {
+    if (!ask.trim()) return;
+    dispatch({
+      type: 'new-conversation',
+      id: crypto.randomUUID(),
+      device: ask.trim(),
+      symptom: 'knowledge base inquiry',
+      attachments: [],
+    });
+  };
+
   return (
     <div className="newconv panel">
       <div className="newconv-title">Describe the fault</div>
@@ -67,6 +79,15 @@ export function NewConversation() {
         <button className="btn btn-primary" onClick={start} disabled={!device.trim() || !symptom.trim()}>
           Start diagnosis
         </button>
+      </div>
+      <div className="newconv-ask">
+        <span className="newconv-ask-label mono">OR</span>
+        <input
+          placeholder="Ask the knowledge base anything ('what do we know about the HMMWV transmission?')"
+          value={ask}
+          onChange={(e) => setAsk(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && askUniverse()}
+        />
       </div>
       <div className="newconv-presets">
         {PRESETS.map((p) => (

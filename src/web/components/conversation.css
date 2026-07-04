@@ -348,3 +348,7 @@
 .wo-missing { margin: 0; padding-left: 18px; font-size: var(--fs-sm); color: var(--warn); }
 
 .wo-foot { display: flex; gap: var(--sp-2); justify-content: flex-end; }
+
+.newconv-ask { display: flex; align-items: center; gap: var(--sp-2); }
+.newconv-ask-label { color: var(--text-faint); font-size: var(--fs-xs); letter-spacing: 0.14em; }
+.newconv-ask input { flex: 1; }

@@ -204,3 +204,13 @@
   border-radius: 999px;
   padding: 0 6px;
 }
+
+.galaxy-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  letter-spacing: 0.12em;
+  font-size: var(--fs-sm);
+}
