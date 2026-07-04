@@ -16,7 +16,7 @@ export interface SafetyInfo { lines: string[]; citations: Citation[] }
 export interface MeasurementVerdict { withinSpec: boolean; specRange: string; verdict: string; suggestedComponent?: string }
 export interface PhaseEvent { phase: Phase; summary: string; detail?: string; citations?: Citation[]; hitPages?: { docId: string; page: number }[] }
 export interface ProposedAction { label: string; action: string }
-export interface GuidedStep { index: number; phaseEvents: PhaseEvent[]; instruction: string; citations: Citation[]; proposedNext: ProposedAction[]; confidence: number; confidenceReason: string; status: StepStatus }
+export interface GuidedStep { index: number; phaseEvents: PhaseEvent[]; instruction: string; citations: Citation[]; proposedNext: ProposedAction[]; confidence: number; confidenceReason: string; status: StepStatus; diagnosis?: Diagnosis; parts?: PartLine[]; safety?: SafetyInfo }
 export interface Attachment { kind: 'image'; dataUrl: string; name: string }
 export interface Conversation { id: string; device: string; symptom: string; attachments: Attachment[]; steps: GuidedStep[]; userInputs: string[]; status: 'active' | 'closed' }
 export interface WorkOrder { device: string; symptom: string; diagnosis: Diagnosis; procedure: string[]; parts: PartLine[]; safety: string[]; citations: Citation[]; missingDocs: string[]; confidence: number; confidenceReason: string }

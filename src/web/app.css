@@ -14,6 +14,18 @@
     var(--bg0);
 }
 
+.center-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.center-newconv {
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--sp-5) var(--sp-6);
+}
+
 .view-placeholder {
   height: 100%;
   display: flex;

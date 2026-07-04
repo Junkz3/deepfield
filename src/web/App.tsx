@@ -1,27 +1,22 @@
 import { useEffect } from 'react';
 import { AppProvider, useApp } from './store';
 import { Sidebar } from './components/Sidebar';
+import { ConversationView } from './components/ConversationView';
+import { NewConversation } from './components/NewConversation';
 import './app.css';
 
-function CenterPlaceholder() {
+function CenterView() {
   const { docs } = useApp();
   return (
-    <section className="view-placeholder fade-up">
-      <h1>Repair Center</h1>
-      <p className="mono">{docs.length} documents in the knowledge base</p>
-      <p>The knowledge galaxy renders here.</p>
-    </section>
-  );
-}
-
-function ConversationPlaceholder({ id }: { id: string }) {
-  const { state } = useApp();
-  const conv = state.conversations.find((c) => c.id === id);
-  return (
-    <section className="view-placeholder fade-up">
-      <h1>{conv?.device ?? 'Conversation'}</h1>
-      <p className="mono">{conv?.symptom}</p>
-      <p>The copilot cockpit renders here.</p>
+    <section className="center-view fade-up">
+      <div className="view-placeholder" style={{ flex: 1 }}>
+        <h1>Repair Center</h1>
+        <p className="mono">{docs.length} documents in the knowledge base</p>
+        <p>The knowledge galaxy renders here.</p>
+      </div>
+      <div className="center-newconv">
+        <NewConversation />
+      </div>
     </section>
   );
 }
@@ -50,9 +45,9 @@ function Shell() {
       <Sidebar />
       <main className="main">
         {state.activeView.kind === 'center' ? (
-          <CenterPlaceholder />
+          <CenterView />
         ) : (
-          <ConversationPlaceholder id={state.activeView.id} />
+          <ConversationView id={state.activeView.id} />
         )}
       </main>
     </div>

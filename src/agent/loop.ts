@@ -51,6 +51,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
           { label: 'Compile work order', action: 'compile-work-order' },
         ],
         confidence: conf.value, confidenceReason: conf.reason, status: 'ok',
+        diagnosis, parts: [part], safety: await checkSafety(`replace ${verdict.suggestedComponent}`),
       };
     }
   }
@@ -116,6 +117,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
       { label: 'Show the wiring diagram', action: 'show-citation:1' },
     ],
     confidence: conf.value, confidenceReason: conf.reason, status: 'ok',
+    diagnosis, parts: [part], safety,
   };
 }
 

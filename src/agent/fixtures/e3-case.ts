@@ -3,7 +3,8 @@ import type { Diagnosis, Page, PlanAction } from '../types';
 export const HERO_DOC_ID = 'whirlpool-w11187658';
 
 export const E3_PAGES: Record<'errorTable' | 'wiring' | 'troubleshooting', Page> = {
-  errorTable: { docId: HERO_DOC_ID, page: 18, imageUrl: `/corpus/${HERO_DOC_ID}/p18.png`, kind: 'error-table', region: { x: 0.08, y: 0.30, w: 0.84, h: 0.06 }, text: 'E3 HEATER FAILURE - temperature does not reach value after 90 min. Check heater, thermistor, control.' },
+  // Region verified against the rendered p18.png (120 DPI, 1020x1320): the E3 table row.
+  errorTable: { docId: HERO_DOC_ID, page: 18, imageUrl: `/corpus/${HERO_DOC_ID}/p18.png`, kind: 'error-table', region: { x: 0.06, y: 0.62, w: 0.85, h: 0.066 }, text: 'E3 HEATER FAILURE - temperature does not reach value after 90 min. Check heater, thermistor, control.' },
   wiring: { docId: HERO_DOC_ID, page: 25, imageUrl: `/corpus/${HERO_DOC_ID}/p25.png`, kind: 'schematic', region: { x: 0.15, y: 0.2, w: 0.7, h: 0.5 } },
   troubleshooting: { docId: HERO_DOC_ID, page: 19, imageUrl: `/corpus/${HERO_DOC_ID}/p19.png`, kind: 'troubleshooting' },
 };
