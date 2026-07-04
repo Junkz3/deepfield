@@ -45,7 +45,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
       const conf = computeConfidence({ exactCodeMatch: true, corroboratingCitations: 1, requiredPageMissing: false });
       return {
         index: conversation.steps.length, phaseEvents: events,
-        instruction: `${verdict.verdict} Now test the ${verdict.suggestedComponent}: ${diagnosis.checks[0]}`,
+        instruction: diagnosis.instruction ? `${verdict.verdict} ${diagnosis.instruction}` : `${verdict.verdict} Now test the ${verdict.suggestedComponent}: ${diagnosis.checks[0]}`,
         citations: [], proposedNext: [
           { label: `Order ${part.name} (${part.ref})`, action: `order-part:${part.ref}` },
           { label: `${verdict.suggestedComponent} also in spec`, action: `report-measurement:${verdict.suggestedComponent}:52000` },
@@ -127,7 +127,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
 
   return {
     index: conversation.steps.length, phaseEvents: events,
-    instruction: `${diagnosis.cause} Start with: ${diagnosis.checks[0]}.`,
+    instruction: diagnosis.instruction ?? `${diagnosis.cause} First: ${diagnosis.checks[0]}.`,
     citations,
     proposedNext: proposedNext.slice(0, 4),
     confidence: conf.value, confidenceReason: conf.reason, status: 'ok',

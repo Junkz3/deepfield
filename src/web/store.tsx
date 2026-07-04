@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useMemo, useReducer } from 'react
 import type { ReactNode } from 'react';
 import type { Attachment, Conversation, Document, GuidedStep } from '../agent/types';
 import { mergeDocs } from '../agent/taxonomy';
+import { setAgentLanguage } from '../vultr/client';
 
 export type DriverKind = 'fake' | 'vultr';
 
@@ -167,6 +168,11 @@ const AppCtx = createContext<Ctx | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+
+  // The agent speaks the selected language from the very first call.
+  useEffect(() => {
+    setAgentLanguage(langName(state.lang));
+  }, [state.lang]);
 
   // Boot: load the build-time corpus (absent in early dev = empty galaxy, fine).
   useEffect(() => {
