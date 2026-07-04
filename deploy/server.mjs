@@ -14,6 +14,10 @@ const PORT = Number(process.env.PORT ?? 8080);
 const DIST = process.env.DIST ?? 'dist';
 const KEY = process.env.VULTR_INFERENCE_API_KEY;
 const BASE = process.env.VULTR_BASE_URL ?? 'https://api.vultrinference.com/v1';
+// Optional private-demo lock: when set, inference requires the access key
+// (the app forwards ?key=<token> from its URL). Static pages stay public,
+// credits do not.
+const DEMO_TOKEN = process.env.DEMO_TOKEN;
 if (!KEY) { console.error('VULTR_INFERENCE_API_KEY is required'); process.exit(1); }
 
 const ALLOWED_PATHS = new Set(['/chat/completions', '/rerank']);
@@ -53,7 +57,12 @@ const server = createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/agent') {
       const ip = req.socket.remoteAddress ?? 'unknown';
       if (limited(ip)) { res.writeHead(429).end('rate limited'); return; }
-      const { path, body } = JSON.parse(await readBody(req));
+      const { path, body, token } = JSON.parse(await readBody(req));
+      if (DEMO_TOKEN && token !== DEMO_TOKEN) {
+        res.writeHead(401, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'access key required: open the app with ?key=<your access key>' }));
+        return;
+      }
       if (!ALLOWED_PATHS.has(path)) { res.writeHead(400).end('path not allowed'); return; }
       const upstream = await fetch(BASE + path, {
         method: 'POST',

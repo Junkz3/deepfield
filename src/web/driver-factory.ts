@@ -15,8 +15,20 @@ export async function getDriver(kind: DriverKind): Promise<ModelDriver> {
     driver = new FakeDriver();
   } else {
     const { VultrDriver, proxyTransport } = await import('../vultr/client');
-    driver = new VultrDriver(proxyTransport());
+    driver = new VultrDriver(proxyTransport(demoToken()));
   }
   cache.set(kind, driver);
   return driver;
+}
+
+/** Private-demo access key: read from ?key= in the URL once, kept for the
+ *  session. Only meaningful when the server sets DEMO_TOKEN. */
+function demoToken(): string | undefined {
+  try {
+    const fromUrl = new URLSearchParams(location.search).get('key');
+    if (fromUrl) { sessionStorage.setItem('rc.key', fromUrl); return fromUrl; }
+    return sessionStorage.getItem('rc.key') ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
