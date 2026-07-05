@@ -82,7 +82,7 @@ text layer fall back to a side-pane read of the page image.
 ```
 npm install
 npm run demo        # offline agent loop in the terminal, no API key needed
-npm run dev         # web app on http://localhost:5173 (offline scripted driver)
+npm run dev         # web app on http://localhost:5173 (?driver=fake = offline script, no key)
 npm test            # 105 unit tests (agent loop, taxonomy, teams, confidence rubric)
 ```
 
