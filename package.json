@@ -1,5 +1,5 @@
 {
-  "name": "repaircenter",
+  "name": "deepfield",
   "version": "0.1.0",
   "description": "Manual-agnostic, document-grounded repair agent (RAISE hackathon, Vultr track)",
   "main": "index.js",
