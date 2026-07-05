@@ -139,7 +139,6 @@ export function WorkOrderView({ conversation, docs, onClose }: { conversation: C
 
         <footer className="wo-foot">
           <button className="btn btn-primary" onClick={download}>Download Markdown</button>
-          <button className="btn" title="Integration stub">Push to FSM</button>
           <button className="btn" onClick={onClose}>Close</button>
         </footer>
       </article>
