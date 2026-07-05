@@ -112,6 +112,13 @@ were reverted: the engine stays generic, the failure modes stay documented
    vertical structure; the visible "What is covered" title wins. This needs
    a stronger reader or model-level work, not engine plumbing. The bench
    holds the case; any future model swap gets measured against it.
+   Final escalation, also measured: an explicit continuity FACT in the
+   prompt ("the list at the top of p.12 continues the section on p.11; its
+   items belong to that heading") changed nothing - the model answered
+   "covered, as listed under item 2a (p.12)", citing the exclusion item
+   itself as proof of coverage. Not a binding failure then: a polarity
+   prior ("home emergency covers repairs") that survives even a spelled-out
+   structural fact. Reverted like the rest; model-level stands confirmed.
 3. **Near-model transfer without a disclaimer.** iPhone 14 screen question
    can answer with opening steps from the iPhone SE 2020 BATTERY guide
    without flagging either mismatch (intermittent; run 4 passed). Confidence
