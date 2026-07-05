@@ -180,7 +180,7 @@ function AuthScreen({ onSignedIn, resetToken, initialNotice, onResetConsumed }: 
         <button className="btn btn-primary auth-submit" onClick={() => void submit()} disabled={busy || !canSubmit}>
           {busy ? 'One moment…' : submitLabels[mode]}
         </button>
-        {mode !== 'reset' && (
+        {(mode === 'login' || mode === 'signup') && (
           <button
             className="auth-switch mono"
             onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(null); setNotice(null); }}
