@@ -1,0 +1,95 @@
+# Live benchmark: real performance and generalization
+
+This is the measured-performance side of Deepfield. The same methodology that
+ships inside the product as the self-check feature, but against a versioned
+gold set of hand-verified facts instead of model-written probes. Nothing is
+mocked: every run drives the production agent loop (`runStep`) with the
+production `VultrDriver` against the live Vultr Serverless Inference endpoint.
+
+```bash
+set -a; source .env; set +a
+npm run bench                                  # full gold set (about 20 min, 2 in flight)
+npm run bench -- --only diag-whirlpool-e3      # targeted case
+npm run bench -- --group insurance,french      # one or more families
+```
+
+Results land in `bench/results/<label>.json` with, per item: pass verdict,
+status, literal-fact hit, cited doc, cited page (+-1), video timestamps,
+confidence, retrieval rounds, per-phase latency, the full phase timeline
+(including the actual retrieval queries the plan wrote) and the answer.
+
+## Gold set design
+
+39 questions in `goldset.json`, every answer verified on the printed page
+before writing the item. Ten families, each probing a different way the
+system could fail to generalize:
+
+| Family | Items | What it proves |
+| --- | --- | --- |
+| factual-qa | 12 | Precise values across 12 device types (ranges, ratios, part specs), incl. a fact printed on a FRENCH page of a bilingual manual and a scanned military resistance chart |
+| diagnose | 6 | Error codes never rehearsed during development (E4, E6, Jam Rear, fails-to-crank) next to the two positive controls (E3, DTC 21) |
+| french | 4 | French questions over the English corpus: query translation, French verdicts |
+| paraphrase | 2 | The symptom described colloquially, without the error code ("quick and glass lights flash, dishes come out cold" must map to E3) |
+| out-of-corpus | 3 | Honest refusal: Tesla, PS5 (near-category trap: a Joy-Con guide exists), iPhone 14 (near-model trap: SE 2020 battery guide exists) |
+| missing-fact | 2 | Admitting what the pages do not hold (4K on a 1080p camera, a device-specific Wi-Fi key) |
+| cross-doc | 1 | Two printer manuals in scope; the right one must be cited |
+| video | 2 | Timestamped segment citations, via the action button and via natural language |
+| scope | 1 | Workspace inventory answered from the taxonomy itself |
+| insurance | 6 | Same engine, other vertical: coverage limits, exclusion polarity, a scoping trap (the Allianz product is classified under its underwriter Jefferson) |
+
+Scoring is deterministic (`scoreProbe`, shared with the product self-check):
+a pass needs the literal expected value in the normalized answer AND the
+expected document cited (page +-1 tracked separately as retrieval strictness).
+For out-of-corpus items the honest no-evidence step IS the pass.
+
+## Results
+
+Run 1 (2026-07-05, before fixes): 29/39 (74 percent), doc cited 34/34,
+page +-1 27/29 (93 percent), p50 latency 31.6s, zero harness errors.
+
+Failure triage on run 1:
+
+- 3 scoring false negatives (the engine was right): unicode dashes in
+  "90-135 VAC" broke literal matching (fixed in `selfcheck.ts`, now unit
+  tested), a US-variant FM range read off the same page, and a "do not
+  contain" phrasing the marker list missed (gold set widened).
+- 2 retrieval-variance misses on 300+ page manuals: the plan sometimes
+  writes queries carrying the device name, and the visual rerank then crowns
+  the pages that DISPLAY that name (covers, title pages) over the fault
+  table. Measured: with the plan's query the Brother "Jam Rear" table ranks
+  6th (6.88) behind five covers (8.61 to 7.08); with the bare symptom it
+  ranks 1st. Both cases passed on rerun; the reproducible one (Brother) is
+  now covered by the SECOND LOOK in `loop.ts`: when diagnose returns
+  insufficient evidence, retry once with the bare symptom over the unread
+  pages. Triggers only on the failure path.
+Run 2 (2026-07-05, after fixes): **34/39 (87 percent)**, doc cited 34/34,
+page +-1 29/29 (100 percent), p50 latency 40.1s, zero harness errors.
+Diagnose 6/6 (the Brother Jam Rear case now passes with the fault table
+cited), insurance 6/6, video 2/2, cross-doc 1/1, scope (EN) 1/1,
+factual-qa 11/12. The five remaining misses are three of the documented
+failure modes below (Wi-Fi example key, iPhone 14 transfer, French scope)
+plus plan-query variance on two items that pass on other runs (the M-85
+PSI value in a 349-page manual, the no-code paraphrase mapping to E3).
+
+## Known failure modes (kept, documented)
+
+Left as measured weaknesses rather than risky last-minute prompt surgery
+(the diagnose prompt is lace; see CLAUDE.md):
+
+1. **Example values read as truth.** Asked for "the default Wi-Fi key of my
+   router", the agent quoted the sample key printed in a manual illustration
+   as if it were the user's. The right answer (the key is on the device
+   label) was one page away. Prompt-level fix, needs the full ladder re-run.
+2. **Exclusion polarity (intermittent).** "Are repairs to a boiler over 15
+   years old covered?" answered "Yes." on run 1 while the page lists it
+   under an exclusions heading whose title sits outside the text snippet;
+   run 2 answered it correctly. Structure-aware reading of
+   what-is-NOT-covered sections is the open problem.
+3. **Near-model transfer without a disclaimer.** iPhone 14 screen question
+   answered with opening steps from the iPhone SE 2020 BATTERY guide,
+   without flagging either mismatch. Confidence self-reported low (0.20),
+   which the UI surfaces, but the verdict should name the mismatch.
+4. **Informal French scope questions.** "T'as quoi comme appareils ?" is in
+   the plan prompt as a scope example, yet Nemotron missed the intent twice
+   (the English equivalent routes correctly). French scope asks fall back to
+   retrieval answers.
