@@ -16,11 +16,23 @@ import displayFont from '@fontsource/space-grotesk/files/space-grotesk-latin-500
 
 const R = 2.75; // shell radius of the file planet
 
-// Ambient idle orbit: rotate the camera around the agent, time-based so it stays
-// smooth at any frame rate (three's built-in autoRotate steps a fixed angle per
-// frame and stutters on a heavy scene).
-const IDLE_UP = new THREE.Vector3(0, 1, 0);
-const IDLE_SPIN_RATE = 0.06; // rad/s, gentle
+// Ambient idle orbit: rotate the camera around the agent. Time-based AND
+// low-pass smoothed, because the galaxy scene dips below 60fps: a target angle
+// advances with real elapsed time, the applied angle eases toward it, so a
+// dropped frame's catch-up is spread over several frames instead of landing as
+// one visible jump (which is what read as stutter).
+// A tilted axis (not straight up) so the sphere sweeps on a diagonal around the
+// agent instead of flat left-to-right. Kept modest so the camera's elevation
+// stays inside the OrbitControls polar limits over a full turn (no clamp jump).
+const IDLE_AXIS = new THREE.Vector3(0.32, 1, 0.2).normalize();
+const IDLE_SPIN_RATE = 0.05; // rad/s, gentle target speed (~2min per turn)
+const IDLE_SPIN_SMOOTH = 4.5; // low-pass rate; smaller = smoother but laggier
+
+// Reused per-frame scratch vectors: a `new THREE.Vector3()` inside a useFrame
+// runs 60x/s (and 30x that across the file cards), and the churn triggers GC
+// pauses that read as stutter. Allocate once, reuse.
+const _cardScale = new THREE.Vector3();
+const _camOff = new THREE.Vector3();
 
 // WebXR entry point. The built-in emulator lets the VR path be exercised (and
 // filmed) without a headset. But @pmndrs/xr defaults `emulate` to 'metaQuest3'
@@ -1064,7 +1076,7 @@ function FileCard({ node, targetPos, ghost, bornAtCore, isHit, hitCount, onHover
     if (root.current) {
       if (!dragOff.current) root.current.position.lerp(targetPos, Math.min(dt * 2.6, 1));
       const s = sizeMul * (aimed && !ghost ? 1.15 : 1);
-      root.current.scale.lerp(new THREE.Vector3(s, s, s), Math.min(dt * 5, 1));
+      root.current.scale.lerp(_cardScale.setScalar(s), Math.min(dt * 5, 1));
     }
     if (!mat.current) return;
     const t = clock.elapsedTime;
@@ -1393,7 +1405,7 @@ function FloatingPage({ url, label, title, index, total, anchor, color, onClick,
       if (zoomed && !pinned) pt = VR_READ_SLOT;
       group.current.position.lerp(pt, Math.min(dt * 5, 1));
       const s = scaleMul * (zoomed ? 1.85 * zoomMul : 1) * pop;
-      group.current.scale.lerp(new THREE.Vector3(s, s, s), Math.min(dt * 6, 1));
+      group.current.scale.lerp(_cardScale.setScalar(s), Math.min(dt * 6, 1));
       return;
     }
     // No travel, no bobbing, no re-centering: the card pops in AT its slot
@@ -1606,6 +1618,8 @@ function CameraRig({ focus, panelOpen, idle }: { focus: THREE.Vector3 | null; pa
   const settling = useRef(true);
   const focusKey = useRef('__init__');
   const dragging = useRef(false); // pause the ambient orbit while the user drags
+  const spinTarget = useRef(0);   // idle-orbit angle advancing with real time
+  const spinAngle = useRef(0);    // applied angle, eased toward the target
   useFrame((_, dt) => {
     const cam = camera as THREE.PerspectiveCamera;
     const wantX = panelOpen ? -Math.min(640, size.width * 0.46) / 2 : 0;
@@ -1627,16 +1641,27 @@ function CameraRig({ focus, panelOpen, idle }: { focus: THREE.Vector3 | null; pa
     const key = focus ? `${focus.x.toFixed(2)},${focus.y.toFixed(2)},${focus.z.toFixed(2)}` : 'none';
     if (key !== focusKey.current) { focusKey.current = key; settling.current = true; }
 
-    // Ambient drift: a gentle, time-based camera orbit around the agent when the
-    // universe is idle. Paused while the user drags and while flying to a focus;
-    // `idle` already drops it the instant the agent points a doc or one is
-    // hovered (see the Scene computation). We orbit the CAMERA, not the world,
-    // so every doc's world position (and its bolts / pages) stays aligned.
+    // Ambient drift: a gentle, diagonal camera orbit around the agent when the
+    // universe is idle. The target angle advances with real time; the applied
+    // angle eases toward it (low-pass), so the scene's frame dips don't land as
+    // one visible jump and the stop (when `idle` drops) is a quick ease-out, not
+    // a hard cut. Paused while the user drags and while flying to a focus. We
+    // orbit the CAMERA, not the world, so every doc's world position (and its
+    // bolts / pages) stays aligned.
     if (idle && !settling.current && !dragging.current) {
-      const off = camera.position.clone().sub(c.target);
-      off.applyAxisAngle(IDLE_UP, IDLE_SPIN_RATE * dt);
-      camera.position.copy(c.target).add(off);
-      c.update();
+      spinTarget.current += IDLE_SPIN_RATE * dt;
+    }
+    if (!settling.current && !dragging.current) {
+      const prevSpin = spinAngle.current;
+      spinAngle.current = spinTarget.current
+        + (prevSpin - spinTarget.current) * Math.exp(-IDLE_SPIN_SMOOTH * dt);
+      const dTheta = spinAngle.current - prevSpin;
+      if (Math.abs(dTheta) > 1e-7) {
+        const off = _camOff.copy(camera.position).sub(c.target);
+        off.applyAxisAngle(IDLE_AXIS, dTheta);
+        camera.position.copy(c.target).add(off);
+        c.update();
+      }
     }
 
     if (!settling.current) return;
