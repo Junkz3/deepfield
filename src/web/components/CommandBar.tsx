@@ -51,13 +51,17 @@ export function CommandBar() {
 
   return (
     <div className="cmdbar-zone">
-      <AgentDock />
-      <div className="cmdbar-presets">
-        {PRESETS.map((p) => (
-          <button key={p.label} className="cmdbar-preset mono" onClick={() => launch(p.device, p.symptom)}>
-            {p.label}
-          </button>
-        ))}
+      {/* One tools row aligned to the bar: agent identity left, quick-starts
+          right. Keeps the cluster reading as a console, not floating chips. */}
+      <div className="cmdbar-tools">
+        <AgentDock />
+        <div className="cmdbar-presets">
+          {PRESETS.map((p) => (
+            <button key={p.label} className="cmdbar-preset mono" onClick={() => launch(p.device, p.symptom)}>
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
       <div className={`cmdbar ${photo ? 'has-photo' : ''}`}>
         <input

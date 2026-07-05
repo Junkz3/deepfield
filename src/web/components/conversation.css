@@ -490,6 +490,19 @@
   gap: var(--sp-2);
 }
 
+/* Agent identity (left) and quick-starts (right) share one row that spans the
+   bar width, so the cluster reads as a two-tier console instead of three
+   narrow rows floating over the universe at different widths. */
+.cmdbar-tools {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  padding: 0 var(--sp-1);
+}
+
 .cmdbar {
   width: 100%;
   display: flex;
