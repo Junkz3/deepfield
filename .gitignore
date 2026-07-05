@@ -10,4 +10,5 @@ corpus-insurance/src/
 *.log
 public/corpus/
 public/corpus-insurance/
+bench/results/
 .gstack/

@@ -16,6 +16,7 @@ npx vitest run              # unit tests
 npm run demo                # offline scripted agent run in the terminal (FakeDriver)
 npm run ingest              # rebuild public/corpus/ from corpus/manifest.json
 npm run smoke               # live smoke test against the real Vultr endpoint
+npm run bench               # live gold-set benchmark (bench/goldset.json) against the real driver
 node deploy/server.mjs      # the production server (see deploy/ for the VM story)
 ```
 
@@ -86,9 +87,11 @@ SSH password auth is disabled on the VM; access is key-only.
 ## Testing discipline
 
 Unit tests (`vitest`) cover the deterministic engine. Prompt or retrieval
-changes are validated against the LIVE suite (a scripted set of repair,
-Q&A and insurance cases run through the real Vultr driver) before merging:
-run targeted cases first, the full suite before calling anything done.
+changes are validated against the LIVE suite before merging: that suite is
+now versioned as `npm run bench` (39 hand-verified gold questions in
+`bench/goldset.json`, scored on literal facts + cited doc/page; see
+`bench/README.md` for method and known failure modes). Run targeted cases
+first (`--only id1,id2`), the full run before calling anything done.
 Confidence is a deterministic rubric (`confidence.ts`), not model output.
 
 ## Copy rules

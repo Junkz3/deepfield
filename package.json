@@ -10,6 +10,7 @@
     "demo": "tsx src/demo.ts",
     "ingest": "tsx scripts/ingest-corpus.ts",
     "smoke": "tsx scripts/smoke-vultr.ts",
+    "bench": "tsx scripts/bench.ts",
     "deploy": "npm run build && wrangler pages deploy dist --project-name repaircenter"
   },
   "keywords": [],
