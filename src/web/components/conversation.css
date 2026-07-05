@@ -756,12 +756,18 @@
   line-height: 1.5;
 }
 
-.conv-reply {
-  display: flex;
-  gap: var(--sp-2);
-  padding: var(--sp-3) var(--sp-4);
+/* Agent identity + reply are one footer under a single divider, so the agent
+   tag reads as the label of the reply bar, not a strip stranded above it. */
+.conv-foot {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.02);
+}
+
+.conv-reply {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
 }
 .conv-reply input {
   flex: 1;

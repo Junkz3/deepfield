@@ -265,9 +265,10 @@ export function ConversationView({ id }: { id: string }) {
         )}
       </div>
 
-      <AgentDock compact />
-
-      <FreeReply disabled={live.running} onSend={(text) => void run(text)} />
+      <div className="conv-foot">
+        <AgentDock compact />
+        <FreeReply disabled={live.running} onSend={(text) => void run(text)} />
+      </div>
 
       {showWorkOrder && (
         <WorkOrderView conversation={conv} docs={docs} onClose={() => setShowWorkOrder(false)} />
@@ -299,8 +300,8 @@ function FreeReply({ disabled, onSend }: { disabled: boolean; onSend: (text: str
         onText={(t) => setText((prev) => (prev ? `${prev} ${t}` : t))}
         onSubmit={(t) => (disabled ? setText((prev) => (prev ? `${prev} ${t}` : t)) : onSend(t))}
       />
-      <button className="btn" onClick={submit} disabled={disabled || !text.trim()} title="Send">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <button className="cmdbar-go" onClick={submit} disabled={disabled || !text.trim()} title="Send">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M5 12h14M13 6l6 6-6 6" />
         </svg>
       </button>
