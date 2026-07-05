@@ -1,7 +1,8 @@
 # RepairCenter
 
 A manual-agnostic, document-grounded repair agent. Built solo in 24 hours for the RAISE Summit
-hackathon (Statement Two, Vultr track).
+hackathon (Statement Two, Vultr track): every commit in this repo, from the first scaffold to
+the last polish, was written during the event.
 
 Drop in any repair documentation: service manuals, user guides, scanned military TMs, iFixit
 guides, even videos. The agent reads every page as an image, classifies each document, and
@@ -31,14 +32,25 @@ outside the conversation scope fade to ghosts.
 | Visual retrieval (two-stage rerank over page images) | vultr/VultronRetrieverPrime-Qwen3.5-8B |
 | Everything the agent thinks: planning, sufficiency, vision diagnosis, translation | nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16 |
 
-All agent reasoning runs on a single NVIDIA Nemotron model; measured on this workload it parses
-reliably and answers 2-3x faster than the larger generalist alternative once its reasoning is
-kept on a short leash.
-
 There is no vector store and no OCR pipeline in the retrieval path. Stage 1 narrows candidates by
 taxonomy scope plus a lexical prefilter; stage 2 lets VultronRetriever score the actual page
 images against the query. Scanned schematics and fold-outs rank correctly because the pages are
 seen, not text-extracted.
+
+### One NVIDIA model does all the thinking
+
+Every reasoning step (planning, routing between team agents, sufficiency judging, multimodal
+diagnosis over schematics and technician photos, grounded answers, in-place translation) runs
+on a single NVIDIA Nemotron 3 Nano Omni 30B-A3B served by Vultr. Measured on this workload it
+parses reliably and answers 2-3x faster than the larger generalist alternative once its hidden
+reasoning is kept on a short leash: every prompt carries a brevity directive, and degressive
+retry ladders absorb the token-cap and gateway-timeout regimes.
+
+The voice loop is NVIDIA end to end. Hold V and NVIDIA Parakeet (multilingual ASR, answers in
+half a second) sends your words straight to the agent; with VOICE on, verdicts are spoken
+through NVIDIA Magpie TTS Multilingual. Both ride a small gRPC relay (`tools/tts-relay/`, the
+hosted speech APIs are gRPC-only); if the relay is down, TTS falls back to Vultr, then to the
+browser, and the mic button hides rather than pretend.
 
 ## <img src="public/favicon.svg" width="26" height="26" alt=""> Beyond repair: the Deepfield engine
 
@@ -46,7 +58,10 @@ Nothing in the engine is repair-specific. Visual retrieval over page images, aut
 taxonomy, the navigable 3D universe and page-exact citations work on any document corpus.
 RepairCenter is the first app built on Deepfield: open the Studio (`/?studio`), name a
 workspace, drop a corpus, wire your tools, and the same plan-retrieve-cite loop serves legal
-discovery, clinical-trial matching or telecom field operations.
+discovery, clinical-trial matching or telecom field operations. Calibration writes the whole
+workspace: Nemotron designs the agent team and its operations from the corpus and your intent
+sentence, and each request is routed to the right specialist inside the plan call itself, at
+zero extra inference cost.
 
 <img src="public/readme/studio.png" alt="Deepfield Studio: workspace name, workflow presets, agent team, corpus drop zone and tool operations over the live universe">
 
@@ -68,13 +83,17 @@ text layer fall back to a side-pane read of the page image.
 npm install
 npm run demo        # offline agent loop in the terminal, no API key needed
 npm run dev         # web app on http://localhost:5173 (offline scripted driver)
-npm test            # 29 unit tests (agent loop, taxonomy, confidence rubric)
+npm test            # 105 unit tests (agent loop, taxonomy, teams, confidence rubric)
 ```
 
 With a Vultr Serverless Inference key the same UI runs live: put the key in `.env`
 (`VULTR_INFERENCE_API_KEY`, `VULTR_BASE_URL`), then open `/?driver=vultr`. The dev server (and
 the production proxy in `functions/api/agent.ts`) forwards only `/chat/completions` and
 `/rerank`; the key never reaches the browser.
+
+Voice is optional and runs on the NVIDIA speech relay: `cd tools/tts-relay && python -m venv venv
+&& venv/bin/pip install -r requirements.txt && venv/bin/python serve.py`, with `NVIDIA_API_KEY`
+in the app `.env` (generate one on build.nvidia.com).
 
 ## Corpus
 
@@ -97,6 +116,7 @@ src/vultr/      client.ts (VultrDriver: two-stage visual retrieval, diagnosis, t
 src/web/        React app: 3D universe (react-three-fiber), conversation panel, viewer
 functions/      stateless API proxy (allowlist, rate limit, no key in browser)
 scripts/        corpus ingest (pdftoppm, pdftotext -bbox, yt-dlp chapters, ffmpeg frames)
+tools/          NVIDIA speech relay (gRPC bridge: Parakeet ASR in, Magpie TTS out)
 ```
 
 The whole agent runs through one seam (`ModelDriver`): a scripted offline driver for
