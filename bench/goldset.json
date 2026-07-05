@@ -461,6 +461,7 @@
       "device": "Hiscox home insurance",
       "symptom": "Under home emergency, are repairs to a boiler over 15 years old covered?",
       "mustContain": ["not covered", "not cover", "excluded", "exclusion", "does not"],
+      "mustNotContain": ["yes.", "yes,"],
       "expectDocId": "hiscox-home-policy",
       "sourcePage": 12,
       "note": "Home emergency exclusion 2a: boilers over 15 years old are NOT covered"

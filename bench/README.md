@@ -129,8 +129,19 @@ were reverted: the engine stays generic, the failure modes stay documented
    visual structure reading, not the Nemotron family, and an all-NVIDIA
    fix exists: Cascade-2 over the text layer whenever one exists. The
    path: swap or complement the answer reader, validated against the
-   answer-mode slice of the gold set. Not done before the deadline: an
-   answer-model swap deserves its own measured pass.
+   answer-mode slice of the gold set.
+   Integration attempt, measured and REVERTED: a gated hybrid reader
+   (Cascade-2 over images + full text layer whenever every shown page has
+   one) was correct on the 2-page one-shot but WRONG again inside the real
+   loop (4 pages of context re-trigger the coverage prior: "Yes... covered"
+   twice, while marker-matching produced false passes - the gold set now
+   carries mustNotContain "yes." for this item), and reasoning burn pushed
+   5 of 12 items to 78-102s. The reader fix needs either a tighter evidence
+   context or structure-aware ingestion. On that second path, measured with
+   the NVIDIA API: nemoretriever-parse labels "What is not covered" as a
+   typed Section-header block with its bbox (1.8s/page), and
+   nemotron-nano-12b-v2-vl reads the case correctly from raw page images
+   (3.7s). The ingredients exist; wiring them is post-deadline work.
 3. **Near-model transfer without a disclaimer.** iPhone 14 screen question
    can answer with opening steps from the iPhone SE 2020 BATTERY guide
    without flagging either mismatch (intermittent; run 4 passed). Confidence
