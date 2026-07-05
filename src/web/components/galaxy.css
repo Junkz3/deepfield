@@ -231,6 +231,12 @@
   text-transform: capitalize;
   transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
 }
+/* The collapsed trigger is one of the three top HUD controls: size it like the
+   Add files / Enter VR pills so all three share an optical center. */
+.galaxy-filter > .galaxy-filter-chip {
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-sm);
+}
 .galaxy-filter-chip:hover { background: var(--bg3); border-color: var(--accent); color: var(--text); }
 .galaxy-filter-chip.active { color: var(--accent-strong); border-color: var(--accent); }
 .galaxy-filter-caret { color: var(--text-faint); }
