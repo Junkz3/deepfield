@@ -62,34 +62,52 @@ Failure triage on run 1:
   now covered by the SECOND LOOK in `loop.ts`: when diagnose returns
   insufficient evidence, retry once with the bare symptom over the unread
   pages. Triggers only on the failure path.
-Run 2 (2026-07-05, after fixes): **34/39 (87 percent)**, doc cited 34/34,
+Run 2 (2026-07-05, after fixes): 34/39 (87 percent), doc cited 34/34,
 page +-1 29/29 (100 percent), p50 latency 40.1s, zero harness errors.
-Diagnose 6/6 (the Brother Jam Rear case now passes with the fault table
-cited), insurance 6/6, video 2/2, cross-doc 1/1, scope (EN) 1/1,
-factual-qa 11/12. The five remaining misses are three of the documented
-failure modes below (Wi-Fi example key, iPhone 14 transfer, French scope)
-plus plan-query variance on two items that pass on other runs (the M-85
-PSI value in a 349-page manual, the no-code paraphrase mapping to E3).
+
+Reading run 2's answers exposed two FALSE passes: the Wi-Fi answer named
+the type label but still quoted the manual's SAMPLE key, and the boiler
+answer said "Yes" while matching the question's own "15 years" echo. The
+harness was hardened (mustNotContain field, echo markers removed) and the
+one-line prompt guards written against those two cases were REVERTED after
+measurement: they did not fix either answer, and a stricter intent cascade
+tried at the same time regressed an unrelated QA item into the diagnose
+mold. Lesson kept: the gold set gets stricter, the prompts stay generic.
+One generic routing fix survived its measurements: workspace-inventory
+questions route to scope before the informational-question net (was 0/3 on
+informal French, 3/3 after, no intent regression across 6 control items).
+
+Run 4 (2026-07-05, final state, hardened scoring): **36/39 (92 percent)**,
+doc cited 34/34, page +-1 29/29 (100 percent), p50 latency 34.1s, zero
+harness errors. factual-qa 12/12, french 4/4, out-of-corpus 3/3,
+paraphrase 2/2, video 2/2. The three misses: the sample-key quote (killed
+by mustNotContain, exactly as designed), the exclusion polarity, and one
+retrieval-variance miss on the scanned 207-page HMMWV manual (passes 4 of
+5 runs; the honest no-evidence step is the failure shape, never an
+invented verdict).
 
 ## Known failure modes (kept, documented)
 
-Left as measured weaknesses rather than risky last-minute prompt surgery
+Left as measured weaknesses. One-line prompt guards were tried against the
+first two and MEASURED ineffective (the answers did not change), so they
+were reverted: the engine stays generic, the failure modes stay documented
 (the diagnose prompt is lace; see CLAUDE.md):
 
 1. **Example values read as truth.** Asked for "the default Wi-Fi key of my
-   router", the agent quoted the sample key printed in a manual illustration
-   as if it were the user's. The right answer (the key is on the device
-   label) was one page away. Prompt-level fix, needs the full ladder re-run.
-2. **Exclusion polarity (intermittent).** "Are repairs to a boiler over 15
-   years old covered?" answered "Yes." on run 1 while the page lists it
-   under an exclusions heading whose title sits outside the text snippet;
-   run 2 answered it correctly. Structure-aware reading of
-   what-is-NOT-covered sections is the open problem.
+   router", the agent quotes the sample key printed in a manual illustration
+   as if it were the user's, even while correctly naming the type label as
+   the source. The bench kills this with mustNotContain.
+2. **Exclusion polarity.** "Are repairs to a boiler over 15 years old
+   covered?" answers "Yes." while the page lists it under an exclusions
+   heading whose title sits outside the text snippet (intermittent: correct
+   on some runs). Structure-aware reading of what-is-NOT-covered sections
+   is the open problem.
 3. **Near-model transfer without a disclaimer.** iPhone 14 screen question
-   answered with opening steps from the iPhone SE 2020 BATTERY guide,
-   without flagging either mismatch. Confidence self-reported low (0.20),
-   which the UI surfaces, but the verdict should name the mismatch.
-4. **Informal French scope questions.** "T'as quoi comme appareils ?" is in
-   the plan prompt as a scope example, yet Nemotron missed the intent twice
-   (the English equivalent routes correctly). French scope asks fall back to
-   retrieval answers.
+   can answer with opening steps from the iPhone SE 2020 BATTERY guide
+   without flagging either mismatch (intermittent; run 4 passed). Confidence
+   self-reports low (0.20), which the UI surfaces, but the verdict should
+   name the mismatch.
+4. **Scanned-manual retrieval variance.** On the 207-page scanned HMMWV TM,
+   the plan's query wording decides whether the fault table surfaces; about
+   1 run in 5 ends in an honest no-evidence step instead of the verdict.
+   The second-look retry recovers part of this; the residue is documented.
