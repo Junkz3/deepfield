@@ -66,11 +66,39 @@
 }
 .auth-switch:hover { color: var(--accent); }
 
+/* "Free" badge on the create-account switch. Green reads as go / no cost;
+   the single non-amber accent on the card, so it stays a badge and never
+   competes with the amber primary button. Its color holds on switch hover. */
+.auth-free-tag {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin-left: 7px;
+  padding: 1px 6px 2px;
+  border-radius: 999px;
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ok) 38%, transparent);
+}
+
 .auth-note {
   margin: var(--sp-3) 0 0;
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line);
   color: var(--text-faint);
   font-size: 10px;
-  letter-spacing: 0.06em;
+  line-height: 1.55;
+  letter-spacing: 0.05em;
+}
+.auth-note strong { color: var(--ok); font-weight: 600; }
+
+.auth-turnstile {
+  margin-top: var(--sp-3);
+  min-height: 65px; /* reserve the widget height to avoid a layout shift on load */
 }
 
 .auth-checking {

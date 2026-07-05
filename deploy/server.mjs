@@ -20,6 +20,11 @@ const BASE = process.env.VULTR_BASE_URL ?? 'https://api.vultrinference.com/v1';
 // (the app forwards ?key=<token> from its URL). Static pages stay public,
 // credits do not.
 const DEMO_TOKEN = process.env.DEMO_TOKEN;
+// Optional Cloudflare Turnstile on signup/login. When TURNSTILE_SECRET is set,
+// both endpoints require a widget token verified server-side; unset = no captcha
+// (dev, or a deployment that opts out). The sitekey is public and lives in the
+// client build (VITE_TURNSTILE_SITEKEY); only the secret stays here.
+const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET;
 // Multi-user mode: AUTH_ENABLED=1 turns on signup/login, per-user stores
 // and per-account daily inference quotas. Anyone can register and test,
 // nobody can drain the Vultr credits.
@@ -141,6 +146,28 @@ async function readRaw(req, limit = 64 * 1024 * 1024) {
 }
 const readBody = async (req, limit) => (await readRaw(req, limit)).toString('utf8');
 
+// Verify a Turnstile token with Cloudflare. Fails closed: a missing token or an
+// unreachable verifier both return false, so a captcha-gated endpoint never
+// opens on error. Returns true immediately when the feature is off.
+async function verifyTurnstile(token, ip) {
+  if (!TURNSTILE_SECRET) return true;
+  if (typeof token !== 'string' || token.length === 0) return false;
+  try {
+    const form = new URLSearchParams({ secret: TURNSTILE_SECRET, response: token });
+    if (ip && ip !== 'unknown') form.set('remoteip', ip);
+    const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: form,
+      signal: AbortSignal.timeout(8000),
+    });
+    const data = await r.json();
+    return data.success === true;
+  } catch {
+    return false;
+  }
+}
+
 // Speech relay (tools/tts-relay) listens on localhost only; the browser talks
 // same-origin HTTPS here, so phones get the mic and NVIDIA voice too. Relay
 // down = instant 502: the app hides the mic and TTS falls back to Vultr.
@@ -160,6 +187,10 @@ const server = createServer(async (req, res) => {
       let payload = {};
       try { payload = JSON.parse(await readBody(req, 64 * 1024)); } catch { /* empty body is fine for logout */ }
       if (url.pathname === '/api/auth/signup' || url.pathname === '/api/auth/login') {
+        if (!(await verifyTurnstile(payload.turnstileToken, ip))) {
+          json(res, 403, { error: 'captcha check failed, please try again' });
+          return;
+        }
         const r = url.pathname === '/api/auth/signup'
           ? auth.signup(payload.email, payload.password)
           : auth.login(payload.email, payload.password);

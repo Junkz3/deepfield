@@ -7,7 +7,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { GalaxyGlyph } from './Sidebar';
+import { Turnstile } from './Turnstile';
 import './auth.css';
+
+// Public Turnstile sitekey, baked in at build time. Empty = captcha disabled
+// (dev, or a deployment that opts out); the server enforces the matching side.
+const TURNSTILE_SITEKEY = (import.meta.env as Record<string, string | undefined>).VITE_TURNSTILE_SITEKEY;
 
 type Phase =
   | { kind: 'checking' }
@@ -83,6 +88,8 @@ function AuthScreen({ onSignedIn, resetToken, initialNotice, onResetConsumed }: 
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState(initialNotice ?? null);
   const [busy, setBusy] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaNonce, setCaptchaNonce] = useState(0); // bump to remount the widget
 
   const post = async (path: string, body: unknown): Promise<{ ok: boolean; error?: string }> => {
     try {
@@ -122,8 +129,13 @@ function AuthScreen({ onSignedIn, resetToken, initialNotice, onResetConsumed }: 
         setNotice({ ok: true, text: 'Password updated. Sign in with your new password.' });
         return;
       }
-      const r = await post(`/api/auth/${mode}`, { email, password });
-      if (!r.ok) { setError(r.error ?? `${mode} failed`); return; }
+      const r = await post(`/api/auth/${mode}`, { email, password, turnstileToken: captchaToken });
+      if (!r.ok) {
+        setError(r.error ?? `${mode} failed`);
+        setCaptchaToken(null);
+        setCaptchaNonce((n) => n + 1); // token is single-use: force a fresh challenge
+        return;
+      }
       onSignedIn();
     } finally {
       setBusy(false);
@@ -144,7 +156,9 @@ function AuthScreen({ onSignedIn, resetToken, initialNotice, onResetConsumed }: 
   };
   const showEmail = mode !== 'reset';
   const showPassword = mode !== 'forgot';
-  const canSubmit = (!showEmail || email.length > 0) && (!showPassword || password.length > 0);
+  const showCaptcha = Boolean(TURNSTILE_SITEKEY) && (mode === 'login' || mode === 'signup');
+  const canSubmit = (!showEmail || email.length > 0) && (!showPassword || password.length > 0)
+    && (!showCaptcha || Boolean(captchaToken));
 
   return (
     <div className="auth-screen">
@@ -184,6 +198,14 @@ function AuthScreen({ onSignedIn, resetToken, initialNotice, onResetConsumed }: 
             />
           </>
         )}
+        {showCaptcha && (
+          <Turnstile
+            key={captchaNonce}
+            sitekey={TURNSTILE_SITEKEY as string}
+            onToken={setCaptchaToken}
+            onClear={() => setCaptchaToken(null)}
+          />
+        )}
         {error && <div className="auth-error">{error}</div>}
         {notice && <div className={notice.ok ? 'auth-ok' : 'auth-error'}>{notice.text}</div>}
         <button className="btn btn-primary auth-submit" onClick={() => void submit()} disabled={busy || !canSubmit}>
@@ -194,7 +216,9 @@ function AuthScreen({ onSignedIn, resetToken, initialNotice, onResetConsumed }: 
             className="auth-switch mono"
             onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(null); setNotice(null); }}
           >
-            {mode === 'login' ? 'No account yet? Create one' : 'Already registered? Sign in'}
+            {mode === 'login'
+              ? <>No account yet? Create one<span className="auth-free-tag">Free</span></>
+              : 'Already registered? Sign in'}
           </button>
         )}
         {mode === 'login' && (
@@ -213,7 +237,10 @@ function AuthScreen({ onSignedIn, resetToken, initialNotice, onResetConsumed }: 
             Back to sign in
           </button>
         )}
-        <p className="auth-note mono">Accounts get a daily inference budget on this demo deployment.</p>
+        <p className="auth-note mono">
+          <strong>Free</strong> and fully functional. A daily per-account budget and a shared
+          global cap keep this public demo within its inference limits.
+        </p>
       </div>
     </div>
   );
