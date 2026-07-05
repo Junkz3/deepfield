@@ -94,9 +94,14 @@ function defaultSpeakBrowser(text: string, lang: Lang): boolean {
   return true;
 }
 
-/** Local bridge to NVIDIA's hosted Magpie TTS (gRPC-only upstream). Off in
- *  prod: the fetch fails in milliseconds and the chain moves on to Vultr. */
-export const NVIDIA_RELAY_URL = 'http://127.0.0.1:8123';
+/** Bridge to NVIDIA's hosted Magpie TTS (gRPC-only upstream). On localhost
+ *  the relay is a sibling process; anywhere else the production server
+ *  proxies it same-origin at /relay so phones get voice too. Relay down:
+ *  the fetch fails in milliseconds and the chain moves on to Vultr. */
+export const NVIDIA_RELAY_URL =
+  typeof location === 'undefined' || location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+    ? 'http://127.0.0.1:8123'
+    : '/relay';
 
 async function synthesizeNvidia(text: string, lang: Lang, fetchFn: typeof fetch): Promise<Blob> {
   const key = `nvidia/${lang}/${text}`;

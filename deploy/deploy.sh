@@ -15,15 +15,20 @@ echo "== first-time server setup (idempotent) =="
 ssh "$HOST" bash -s <<'SETUP'
 set -e
 command -v node >/dev/null || (apt-get update -qq && apt-get install -y -qq nodejs)
+# speech relay needs ffmpeg (ASR decode) and a python venv
+command -v ffmpeg >/dev/null || (apt-get update -qq && apt-get install -y -qq ffmpeg)
+python3 -c 'import venv' 2>/dev/null || (apt-get update -qq && apt-get install -y -qq python3-venv)
 id repaircenter &>/dev/null || useradd --system --create-home repaircenter
-mkdir -p /opt/repaircenter
+mkdir -p /opt/repaircenter/tts-relay
 SETUP
 
 echo "== sync artifacts =="
 rsync -az --delete dist "$HOST:$APP_DIR/"
 rsync -az deploy/server.mjs deploy/auth.mjs "$HOST:$APP_DIR/deploy/"
 rsync -az .env "$HOST:$APP_DIR/.env"
+rsync -az tools/tts-relay/serve.py tools/tts-relay/requirements.txt "$HOST:$APP_DIR/tts-relay/"
 rsync -az deploy/repaircenter.service "$HOST:/etc/systemd/system/repaircenter.service"
+rsync -az deploy/tts-relay.service "$HOST:/etc/systemd/system/tts-relay.service"
 
 echo "== (re)start =="
 ssh "$HOST" bash -s <<'START'
@@ -32,14 +37,17 @@ echo "PORT=8080" >> /opt/repaircenter/.env.tmp || true
 sort -u /opt/repaircenter/.env /opt/repaircenter/.env.tmp 2>/dev/null > /opt/repaircenter/.env.merged || cp /opt/repaircenter/.env /opt/repaircenter/.env.merged
 mv /opt/repaircenter/.env.merged /opt/repaircenter/.env
 rm -f /opt/repaircenter/.env.tmp
+# speech relay venv (idempotent; the unit runs venv/bin/python)
+[ -x /opt/repaircenter/tts-relay/venv/bin/python ] || python3 -m venv /opt/repaircenter/tts-relay/venv
+/opt/repaircenter/tts-relay/venv/bin/pip install -q -r /opt/repaircenter/tts-relay/requirements.txt
 chown -R repaircenter:repaircenter /opt/repaircenter
 # port 80 needs the capability, not root
 setcap 'cap_net_bind_service=+ep' "$(command -v node)"
 systemctl daemon-reload
-systemctl enable --now repaircenter
-systemctl restart repaircenter
+systemctl enable --now repaircenter tts-relay
+systemctl restart repaircenter tts-relay
 sleep 1
-systemctl --no-pager --lines=5 status repaircenter
+systemctl --no-pager --lines=5 status repaircenter tts-relay
 START
 
 echo "== done: http://${HOST#*@}/ =="

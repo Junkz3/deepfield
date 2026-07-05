@@ -1,7 +1,8 @@
 // Voice input - the technician speaks, NVIDIA Parakeet transcribes. Both go
-// through the local relay (tools/tts-relay) which bridges the gRPC-only
-// hosted ASR to plain HTTP. Without the relay (prod, or not launched) the
-// mic button simply does not appear: relayAvailable() gates the UI.
+// through the speech relay (tools/tts-relay) which bridges the gRPC-only
+// hosted ASR to plain HTTP: local on localhost, /relay same-origin proxy in
+// production. Relay unreachable = the mic button simply does not appear:
+// relayAvailable() gates the UI.
 import type { Lang } from './store';
 import { NVIDIA_RELAY_URL } from './tts';
 

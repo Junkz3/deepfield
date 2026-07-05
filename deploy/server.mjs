@@ -55,7 +55,7 @@ function limited(ip) {
   return h.n > MAX_PER_WINDOW;
 }
 
-async function readBody(req, limit = 64 * 1024 * 1024) {
+async function readRaw(req, limit = 64 * 1024 * 1024) {
   const chunks = [];
   let size = 0;
   for await (const c of req) {
@@ -63,8 +63,15 @@ async function readBody(req, limit = 64 * 1024 * 1024) {
     if (size > limit) throw new Error('body too large');
     chunks.push(c);
   }
-  return Buffer.concat(chunks).toString('utf8');
+  return Buffer.concat(chunks);
 }
+const readBody = async (req, limit) => (await readRaw(req, limit)).toString('utf8');
+
+// Speech relay (tools/tts-relay) listens on localhost only; the browser talks
+// same-origin HTTPS here, so phones get the mic and NVIDIA voice too. Relay
+// down = instant 502: the app hides the mic and TTS falls back to Vultr.
+const RELAY_BASE = process.env.RELAY_URL ?? 'http://127.0.0.1:8123';
+const RELAY_PATHS = new Set(['/health', '/tts', '/asr']);
 
 const server = createServer(async (req, res) => {
   try {
@@ -136,6 +143,27 @@ const server = createServer(async (req, res) => {
       });
       res.writeHead(upstream.status, { 'content-type': 'application/json' });
       res.end(await upstream.text());
+      return;
+    }
+
+    if (url.pathname.startsWith('/relay/')) {
+      const sub = url.pathname.slice('/relay'.length);
+      if (!RELAY_PATHS.has(sub)) { res.writeHead(404).end(); return; }
+      if (limited(`relay:${ip}`)) { res.writeHead(429).end('rate limited'); return; }
+      try {
+        const upstream = await fetch(RELAY_BASE + sub + url.search, {
+          method: req.method,
+          headers: { 'content-type': req.headers['content-type'] ?? 'application/octet-stream' },
+          body: req.method === 'POST' ? await readRaw(req, 12 * 1024 * 1024) : undefined,
+          signal: AbortSignal.timeout(40_000),
+        });
+        res.writeHead(upstream.status, {
+          'content-type': upstream.headers.get('content-type') ?? 'application/octet-stream',
+        });
+        res.end(Buffer.from(await upstream.arrayBuffer()));
+      } catch {
+        res.writeHead(502).end('speech relay unavailable');
+      }
       return;
     }
 

@@ -1,0 +1,15 @@
+[Unit]
+Description=Deepfield speech relay (NVIDIA Magpie TTS + Parakeet ASR)
+After=network.target
+
+[Service]
+Type=simple
+User=repaircenter
+WorkingDirectory=/opt/repaircenter/tts-relay
+EnvironmentFile=/opt/repaircenter/.env
+ExecStart=/opt/repaircenter/tts-relay/venv/bin/python serve.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
