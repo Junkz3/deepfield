@@ -24,13 +24,15 @@ SETUP
 
 echo "== sync artifacts =="
 rsync -az --delete dist "$HOST:$APP_DIR/"
-rsync -az deploy/server.mjs deploy/auth.mjs deploy/mailer.mjs deploy/backup.sh "$HOST:$APP_DIR/deploy/"
+rsync -az deploy/server.mjs deploy/auth.mjs deploy/mailer.mjs deploy/monitor.mjs deploy/backup.sh "$HOST:$APP_DIR/deploy/"
 rsync -az .env "$HOST:$APP_DIR/.env"
 rsync -az tools/tts-relay/serve.py tools/tts-relay/requirements.txt "$HOST:$APP_DIR/tts-relay/"
 rsync -az deploy/repaircenter.service "$HOST:/etc/systemd/system/repaircenter.service"
 rsync -az deploy/tts-relay.service "$HOST:/etc/systemd/system/tts-relay.service"
 rsync -az deploy/repaircenter-backup.service "$HOST:/etc/systemd/system/repaircenter-backup.service"
 rsync -az deploy/repaircenter-backup.timer "$HOST:/etc/systemd/system/repaircenter-backup.timer"
+rsync -az deploy/repaircenter-monitor.service "$HOST:/etc/systemd/system/repaircenter-monitor.service"
+rsync -az deploy/repaircenter-monitor.timer "$HOST:/etc/systemd/system/repaircenter-monitor.timer"
 
 echo "== (re)start =="
 ssh "$HOST" bash -s <<'START'
@@ -60,6 +62,7 @@ setcap 'cap_net_bind_service=+ep' "$(command -v node)"
 systemctl daemon-reload
 systemctl enable --now repaircenter tts-relay
 systemctl enable --now repaircenter-backup.timer
+systemctl enable --now repaircenter-monitor.timer
 systemctl restart repaircenter tts-relay
 sleep 1
 systemctl --no-pager --lines=5 status repaircenter tts-relay

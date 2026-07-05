@@ -1,0 +1,10 @@
+[Unit]
+Description=Deepfield production monitor (signups, security, quotas, health)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=repaircenter
+WorkingDirectory=/opt/repaircenter
+EnvironmentFile=/opt/repaircenter/.env
+ExecStart=/usr/bin/node deploy/monitor.mjs
