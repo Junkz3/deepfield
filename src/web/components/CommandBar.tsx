@@ -2,6 +2,7 @@
 // One free-form input: ask the agent anything; it searches the universe.
 import { useRef, useState } from 'react';
 import type { Attachment } from '../../agent/types';
+import { FREEFORM_SYMPTOM } from '../../agent/types';
 import { AgentDock } from './AgentDock';
 import { VoiceInput } from './VoiceInput';
 import { useApp } from '../store';
@@ -15,7 +16,7 @@ const PRESETS = [
 function parse(text: string): { device: string; symptom: string } {
   const m = text.match(/^(.{3,60}?)\s*(?:—|--|:)\s*(.+)$/);
   if (m) return { device: m[1].trim(), symptom: m[2].trim() };
-  return { device: text.trim(), symptom: 'as described by the technician' };
+  return { device: text.trim(), symptom: FREEFORM_SYMPTOM };
 }
 
 export function CommandBar() {

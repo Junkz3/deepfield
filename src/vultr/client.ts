@@ -1,5 +1,6 @@
 import type { ClassifyInput, DocMeta, ModelDriver, SufficiencyVerdict } from '../agent/driver';
 import type { Diagnosis, Page, PageKind, PlanAction, ScoredPage } from '../agent/types';
+import { FREEFORM_SYMPTOM } from '../agent/types';
 import { workflowProfile } from '../agent/workflow';
 import type { WorkflowProfile } from '../agent/workflow';
 import { activeAgents } from '../agent/workflow';
@@ -94,11 +95,11 @@ export class VultrDriver implements ModelDriver {
       ? `\nRoute this request to exactly ONE team agent:\n${team.map((a) => `- agentId "${a.id}" (${a.profile.agentRole}): handles ${a.charter}; evidence focus: ${a.profile.retrievalHint}`).join('\n')}`
       : '';
     const jsonShape = routed
-      ? '{"goal": string, "queries": [string], "intent": "diagnose"|"question", "agentId": string (the routed agent)}'
-      : '{"goal": string, "queries": [string], "intent": "diagnose"|"question"}';
+      ? '{"goal": string, "queries": [string], "intent": "diagnose"|"question"|"scope", "agentId": string (the routed agent)}'
+      : '{"goal": string, "queries": [string], "intent": "diagnose"|"question"|"scope"}';
     const hint = routed ? "follow the routed agent's evidence focus" : workflowProfile().retrievalHint;
     const text = await chatText(this.t, MODELS.omni,
-      `You are ${role} planning evidence retrieval from a knowledge base that holds PAGINATED DOCUMENT PAGES and TIMESTAMPED VIDEO WALKTHROUGH SEGMENTS.\n${workflowProfile().subjectNoun}: ${q.device}\n${workflowProfile().issueNoun}: ${q.symptom}\nUser input: ${userInput ?? 'none'}${roster}\nThis is quick planning, not analysis: keep any internal reasoning under 30 words. Return STRICT JSON: ${jsonShape} - intent is "diagnose" for faults/symptoms to troubleshoot, "question" for how-to, maintenance, specs or informational asks, "scope" when the user asks what this workspace or assistant covers, supports or can help with; one focused retrieval query (${hint}; start the query with "video walkthrough" when the user wants a demonstration). The retrieval query MUST be written in English (the corpus language) regardless of the user's language; write the goal in ${AGENT_LANG}.`, 8000);
+      `You are ${role} planning evidence retrieval from a knowledge base that holds PAGINATED DOCUMENT PAGES and TIMESTAMPED VIDEO WALKTHROUGH SEGMENTS.\n${q.symptom === FREEFORM_SYMPTOM ? `User request: ${q.device}` : `${workflowProfile().subjectNoun}: ${q.device}\n${workflowProfile().issueNoun}: ${q.symptom}`}\nUser input: ${userInput ?? 'none'}${roster}\nThis is quick planning, not analysis: keep any internal reasoning under 30 words. Return STRICT JSON: ${jsonShape} - intent is "diagnose" for faults/symptoms to troubleshoot, "question" for how-to, maintenance, specs or informational asks, "scope" when the user asks what this workspace or assistant covers, supports or can help with, in any language, however informal (e.g. "what devices can you fix?", "t'as quoi comme appareils?"); one focused retrieval query (${hint}; start the query with "video walkthrough" when the user wants a demonstration). The retrieval query MUST be written in English (the corpus language) regardless of the user's language; write the goal in ${AGENT_LANG}.`, 8000);
     return extractJson<PlanAction>(text, { goal: `Diagnose ${q.symptom}`, queries: [`${q.device} ${q.symptom}`] });
   }
 

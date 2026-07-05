@@ -10,6 +10,10 @@ export interface Page { docId: string; page: number; imageUrl: string; text?: st
 export interface Document { id: string; filename: string; format: DocFormat; category: string; brand: string; model: string; docType: DocType; pages: Page[]; sourceRights: string; origin: Origin }
 export interface Citation { docId: string; page: number; region?: Region; quote?: string; timestamp?: number; label: string; title?: string }
 export interface ScoredPage { page: Page; score: number }
+/** Symptom placeholder for free-form requests (no "device: symptom" split):
+ *  the planner presents these as one user request, not as a device name. */
+export const FREEFORM_SYMPTOM = 'as described by the technician';
+
 export interface PlanAction { goal: string; queries: string[]; intent?: 'diagnose' | 'question' | 'scope'; agentId?: string }
 export interface Diagnosis { component: string; cause: string; checks: string[]; instruction?: string; componentKey?: string; tools?: { id: string; args?: Record<string, string> }[]; followups?: string[] }
 export interface PartLine { ref: string; name: string; inStock: boolean; price?: number; leadDays?: number }

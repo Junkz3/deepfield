@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTaxonomy, candidatePages, layoutGalaxy, mergeDocs, trimPool } from './taxonomy';
+import { buildTaxonomy, candidatePages, layoutGalaxy, mergeDocs, scopeSummary, trimPool } from './taxonomy';
 import type { Document, Page } from './types';
 
 const doc = (id: string, category: string, brand: string, model: string, pages = 2): Document => ({
