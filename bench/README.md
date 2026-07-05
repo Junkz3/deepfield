@@ -142,6 +142,16 @@ were reverted: the engine stays generic, the failure modes stay documented
    typed Section-header block with its bbox (1.8s/page), and
    nemotron-nano-12b-v2-vl reads the case correctly from raw page images
    (3.7s). The ingredients exist; wiring them is post-deadline work.
+   The parse ingredient WAS wired and measured (scripts/enrich-structure.ts
+   writes a structuredText markdown layer per page; the insurance corpus is
+   enriched 213/222 pages): Omni answers the case correctly with images
+   plus structured markdown on minimal contexts, but inside the real loop
+   the verdict flips with page ORDER and with a summary page in context
+   (measured: 11,12 right; 11,12,2 right; 2,11,12 wrong; 12,11,2 wrong).
+   A prior this context-sensitive is not fixable by evidence plumbing, so
+   the answer gate was reverted; the enrichment tool and data layer stay as
+   the foundation for the reliable fix, the VL reader, measured correct on
+   the real 4-page context and deliberately deferred past the deadline.
 3. **Near-model transfer without a disclaimer.** iPhone 14 screen question
    can answer with opening steps from the iPhone SE 2020 BATTERY guide
    without flagging either mismatch (intermittent; run 4 passed). Confidence
