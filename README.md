@@ -1,5 +1,9 @@
 # <img src="public/favicon.svg" width="30" height="30" alt=""> Deepfield
 
+[<img src="public/readme/demo-thumb.png" alt="Watch the one-minute Deepfield demo on YouTube">](https://www.youtube.com/watch?v=fGyVvlguQbo)
+
+*One-minute demo. [Watch it on YouTube.](https://www.youtube.com/watch?v=fGyVvlguQbo)*
+
 Drop any document corpus in, get a grounded enterprise agent out. Deepfield reads every page
 as an image (manuals, policies, scanned fold-outs, even videos), auto-organizes the files into
 a knowledge base rendered as a navigable 3D universe, and calibrates an agent workspace over
