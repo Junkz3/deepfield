@@ -16,6 +16,12 @@ import displayFont from '@fontsource/space-grotesk/files/space-grotesk-latin-500
 
 const R = 2.75; // shell radius of the file planet
 
+// Ambient idle orbit: rotate the camera around the agent, time-based so it stays
+// smooth at any frame rate (three's built-in autoRotate steps a fixed angle per
+// frame and stutters on a heavy scene).
+const IDLE_UP = new THREE.Vector3(0, 1, 0);
+const IDLE_SPIN_RATE = 0.06; // rad/s, gentle
+
 // WebXR entry point. The built-in emulator lets the VR path be exercised (and
 // filmed) without a headset. But @pmndrs/xr defaults `emulate` to 'metaQuest3'
 // when omitted (loads a ~112kB chunk, and on localhost injects an "Enter XR"
@@ -1589,7 +1595,7 @@ function FloatingPage({ url, label, title, index, total, anchor, color, onClick,
 
 /* ---------- camera: the agent drives the eye ---------- */
 
-function CameraRig({ focus, panelOpen }: { focus: THREE.Vector3 | null; panelOpen: boolean }) {
+function CameraRig({ focus, panelOpen, idle }: { focus: THREE.Vector3 | null; panelOpen: boolean; idle: boolean }) {
   const { camera, size } = useThree();
   const controls = useRef<any>(null);
 
@@ -1599,6 +1605,7 @@ function CameraRig({ focus, panelOpen }: { focus: THREE.Vector3 | null; panelOpe
   const viewX = useRef(0);
   const settling = useRef(true);
   const focusKey = useRef('__init__');
+  const dragging = useRef(false); // pause the ambient orbit while the user drags
   useFrame((_, dt) => {
     const cam = camera as THREE.PerspectiveCamera;
     const wantX = panelOpen ? -Math.min(640, size.width * 0.46) / 2 : 0;
@@ -1619,6 +1626,19 @@ function CameraRig({ focus, panelOpen }: { focus: THREE.Vector3 | null; panelOpe
     // frame by frame (the frozen-world rule, extended to the distance).
     const key = focus ? `${focus.x.toFixed(2)},${focus.y.toFixed(2)},${focus.z.toFixed(2)}` : 'none';
     if (key !== focusKey.current) { focusKey.current = key; settling.current = true; }
+
+    // Ambient drift: a gentle, time-based camera orbit around the agent when the
+    // universe is idle. Paused while the user drags and while flying to a focus;
+    // `idle` already drops it the instant the agent points a doc or one is
+    // hovered (see the Scene computation). We orbit the CAMERA, not the world,
+    // so every doc's world position (and its bolts / pages) stays aligned.
+    if (idle && !settling.current && !dragging.current) {
+      const off = camera.position.clone().sub(c.target);
+      off.applyAxisAngle(IDLE_UP, IDLE_SPIN_RATE * dt);
+      camera.position.copy(c.target).add(off);
+      c.update();
+    }
+
     if (!settling.current) return;
 
     const lookTarget = focus ? focus.clone().multiplyScalar(0.82) : new THREE.Vector3(0, 0, 0);
@@ -1641,6 +1661,8 @@ function CameraRig({ focus, panelOpen }: { focus: THREE.Vector3 | null; panelOpe
     <OrbitControls
       ref={controls}
       enablePan={false}
+      onStart={() => { dragging.current = true; }}
+      onEnd={() => { dragging.current = false; }}
       minDistance={5}
       maxDistance={18}
       maxPolarAngle={Math.PI * 0.72}
@@ -1651,9 +1673,10 @@ function CameraRig({ focus, panelOpen }: { focus: THREE.Vector3 | null; panelOpe
 
 /* ---------- scene ---------- */
 
-function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage, vrDraft, onVrKeyboard, onVrSend }: {
+function Scene({ panelOpen, scopeIds, hovering, onHover, onSelect, onOpenPage, vrDraft, onVrKeyboard, onVrSend }: {
   panelOpen: boolean;
   scopeIds: Set<string> | null;
+  hovering: boolean;
   onHover: (h: { doc: Document; x: number; y: number } | null) => void;
   onSelect: (docId: string) => void;
   onOpenPage: (docId: string, page: number) => void;
@@ -1766,6 +1789,18 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage, vrDraft, on
     const last = state.highlight[state.highlight.length - 1];
     return last ? nodes.find((n) => n.doc.id === last.docId) ?? null : null;
   }, [state.highlight, nodes]);
+
+  // Ambient camera drift is only for the idle home universe: on when nothing
+  // is asking for attention, off the instant the agent points a doc (scan /
+  // hit), a conversation opens, a doc is ingested or hovered, or the user
+  // prefers reduced motion.
+  const reduceMotion = useMemo(
+    () => typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
+  );
+  const idleSpin = !reduceMotion && !panelOpen && !hovering && !state.scanning
+    && !state.ingesting && hitByDoc.size === 0 && focusNode === null;
 
   // VR: the doc the halo marks — the user's selection wins, then the agent's
   // latest find. The world NEVER rotates (pure field rotation = motion
@@ -2058,7 +2093,7 @@ function Scene({ panelOpen, scopeIds, onHover, onSelect, onOpenPage, vrDraft, on
       {/* Desktop: the agent drives the eye. In an immersive session the
           headset owns the camera, so the rig must not fight it. */}
       <IfInSessionMode deny={['immersive-vr', 'immersive-ar']}>
-        <CameraRig focus={focusNode ? livePos(focusNode) : null} panelOpen={panelOpen} />
+        <CameraRig focus={focusNode ? livePos(focusNode) : null} panelOpen={panelOpen} idle={idleSpin} />
       </IfInSessionMode>
       {/* VR: the user stands INSIDE the planet of files, eye level just
           above the plasma core, one step back. */}
@@ -2124,6 +2159,7 @@ export function Galaxy3D({ panelOpen = false, scopeIds = null, onSelectDoc, onOp
           <Scene
             panelOpen={panelOpen}
             scopeIds={scopeIds}
+            hovering={hover !== null}
             onHover={setHover}
             onSelect={(id) => onSelectDoc?.(id)}
             onOpenPage={(d, p) => onOpenPage?.(d, p)}
