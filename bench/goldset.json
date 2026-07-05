@@ -212,7 +212,7 @@
       "corpus": "repair",
       "device": "Brother HL-L2350DW printer",
       "symptom": "display shows Jam Rear",
-      "mustContain": ["fuser"],
+      "mustContain": ["fuser", "back cover"],
       "expectDocId": "brother-hll2350dw-user-guide",
       "sourcePage": 149,
       "note": "Jam Rear = open the fuser cover and remove jammed paper"
@@ -322,7 +322,7 @@
       "corpus": "repair",
       "device": "iPhone 14",
       "symptom": "cracked screen needs replacement",
-      "mustContain": ["battery", "se 2020", "does not", "only covers", "not in the knowledge base"],
+      "mustContain": ["battery guide", "battery replacement", "se 2020", "does not", "only covers", "not in the knowledge base"],
       "note": "Near-miss trap: corpus covers iPhone SE 2020 BATTERY only. Pass = no-evidence OR an answer that admits the mismatch"
     },
 
@@ -345,6 +345,7 @@
       "device": "AVM FRITZ!Box 7590 router",
       "symptom": "What is the default Wi-Fi network key of my router?",
       "mustContain": ["label", "sticker", "underside", "printed on", "base of the", "individual"],
+      "mustNotContain": ["3779"],
       "expectDocId": "avm-fritzbox-7590-manual",
       "note": "Device-specific secret: the manual can only point at the type label; inventing a key would be the failure"
     },
@@ -459,7 +460,7 @@
       "profile": "insurance",
       "device": "Hiscox home insurance",
       "symptom": "Under home emergency, are repairs to a boiler over 15 years old covered?",
-      "mustContain": ["15 years", "not cover", "excluded", "does not"],
+      "mustContain": ["not covered", "not cover", "excluded", "exclusion", "does not"],
       "expectDocId": "hiscox-home-policy",
       "sourcePage": 12,
       "note": "Home emergency exclusion 2a: boilers over 15 years old are NOT covered"

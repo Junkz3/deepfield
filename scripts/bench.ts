@@ -27,6 +27,9 @@ interface BenchItem {
   symptom: string;
   userInput?: string;
   mustContain: string[];
+  /** Literals that must NOT appear in the answer (e.g. a sample value quoted
+   *  as the user's own, a "Yes" where the policy excludes). Any hit fails. */
+  mustNotContain?: string[];
   expectDocId?: string;
   sourcePage?: number;
   note?: string;
@@ -39,6 +42,7 @@ interface BenchResult {
   pass: boolean;
   status: string;
   factFound: boolean;
+  forbiddenHit: boolean;
   docCited: boolean | null;
   pageCited: boolean | null;
   videoCited: boolean;
@@ -100,6 +104,12 @@ function verdict(item: BenchItem, step: GuidedStep): Omit<BenchResult, 'id' | 'g
     { docId: item.expectDocId ?? '', page: item.sourcePage ?? -999 },
   );
   const factFound = item.mustContain.length > 0 ? probe.factFound : true;
+  // Same normalization path as mustContain: a hit on any forbidden literal
+  // fails the item whatever the type (catches sample values quoted as real,
+  // and polarity flips that echo the question's own words).
+  const forbiddenHit = (item.mustNotContain ?? []).length > 0
+    ? scoreProbe(answerText, [], { question: '', mustContain: item.mustNotContain! }, { docId: '', page: -999 }).factFound
+    : false;
   const docCited = item.expectDocId ? step.citations.some((c) => c.docId === item.expectDocId) : null;
   const pageCited = item.sourcePage != null ? probe.pageCited : null;
   const videoCited = step.citations.some((c) => typeof c.timestamp === 'number');
@@ -124,7 +134,8 @@ function verdict(item: BenchItem, step: GuidedStep): Omit<BenchResult, 'id' | 'g
       pass = factFound;
       break;
   }
-  return { pass, status: step.status, factFound, docCited, pageCited, videoCited, confidence: step.confidence };
+  if (forbiddenHit) pass = false;
+  return { pass, status: step.status, factFound, forbiddenHit, docCited, pageCited, videoCited, confidence: step.confidence };
 }
 
 async function runItem(item: BenchItem, docs: Document[], driver: VultrDriver): Promise<BenchResult> {
@@ -175,7 +186,7 @@ async function runItem(item: BenchItem, docs: Document[], driver: VultrDriver): 
   } catch (err) {
     return {
       id: item.id, group: item.group, type: item.type,
-      pass: false, status: 'error', factFound: false, docCited: null, pageCited: null,
+      pass: false, status: 'error', factFound: false, forbiddenHit: false, docCited: null, pageCited: null,
       videoCited: false, confidence: 0, retrieveRounds, durationMs: Date.now() - t0,
       phaseMs: {}, citations: [], answer: '',
       timeline: timeline.map((e) => `${(e.t / 1000).toFixed(1)}s ${e.phase}: ${e.summary.slice(0, 160)}`),
@@ -239,6 +250,7 @@ async function main() {
       const r = await runItem(item, corpora[item.corpus], driver);
       const flags = [
         r.factFound ? 'fact' : (item.mustContain.length ? 'FACT-MISS' : ''),
+        r.forbiddenHit ? 'FORBIDDEN-HIT' : '',
         r.docCited === false ? 'DOC-MISS' : '',
         r.pageCited === false ? 'page-miss' : '',
         r.error ? `ERR ${r.error.slice(0, 60)}` : '',
