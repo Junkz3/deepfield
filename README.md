@@ -17,7 +17,8 @@ commit in this repo, from the first scaffold to the last polish, was written dur
 
 The 3D universe is not decoration: it is the retrieval made visible. When the agent searches,
 lightning probes the candidate files; when it cites, the real pages fan out in space; documents
-outside the conversation scope fade to ghosts.
+outside the conversation scope fade to ghosts. A WebXR mode turns the universe into a place you
+can stand in, and the whole UI is touch-first down to iPads and phones.
 
 ## Any corpus, any workflow: the Studio
 
@@ -37,7 +38,8 @@ analyst) over six public policy documents.
 ## RepairCenter: the first Deepfield app, and the demo
 
 Drop in any repair documentation: service manuals, user guides, scanned military TMs, iFixit
-guides, even videos. A technician describes a fault in any language; the agent reads schematics
+guides, even videos. A technician describes a fault or asks any question, in any language; the
+agent reads schematics
 and the technician's photos, calls the repair workspace's tools (parts stock, measurements),
 follows the manual's own cross-references like a technician would, and delivers a cited
 step-by-step repair path that compiles into a work order.
@@ -89,7 +91,8 @@ text layer fall back to a side-pane read of the page image.
 npm install
 npm run demo        # offline agent loop in the terminal, no API key needed
 npm run dev         # web app on http://localhost:5173 (?driver=fake = offline script, no key)
-npm test            # 105 unit tests (agent loop, taxonomy, teams, confidence rubric)
+npm test            # 108 unit tests (agent loop, taxonomy, teams, confidence rubric)
+npm run bench       # 39 hand-verified gold questions against the live agent (needs a key)
 ```
 
 With a Vultr Serverless Inference key the same UI runs live: put the key in `.env`
