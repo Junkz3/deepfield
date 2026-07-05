@@ -20,12 +20,14 @@ export function GalaxyGlyph({ size = 18 }: { size?: number }) {
   );
 }
 
-export function Sidebar() {
+/** On phones the sidebar is an off-canvas drawer (mobile.css): `open` slides
+ *  it in over the universe; desktop ignores the class entirely. */
+export function Sidebar({ open = false }: { open?: boolean }) {
   const { state, dispatch } = useApp();
   const isCenter = state.activeView.kind === 'center';
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${open ? 'open' : ''}`}>
       <div className="sidebar-brand">
         <span className="sidebar-brand-mark" aria-hidden>
           <GalaxyGlyph size={22} />

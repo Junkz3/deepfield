@@ -22,7 +22,10 @@ import '@fontsource/space-grotesk/500.css';
 import '@fontsource/space-grotesk/600.css';
 import './tokens.css';
 import { App } from './App';
-// LAST import: finger-size overrides must win the cascade over component CSS
+// LAST imports: the override layers must win the cascade over component CSS.
+// touch.css grows the targets (coarse pointers), mobile.css reflows the
+// layout (narrow viewports); both are inert on the desktop demo.
 import './touch.css';
+import './mobile.css';
 
 createRoot(document.getElementById('root')!).render(<App />);

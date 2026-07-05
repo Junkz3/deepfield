@@ -1,0 +1,150 @@
+/* Phone geometry. Imported after touch.css (main.tsx) so both override layers
+   win the cascade: touch.css grows the targets, this file reflows the layout.
+   Everything is scoped to narrow viewports: desktop and the iPad demo keep
+   the exact reference layout. */
+
+/* The drawer handle and scrim exist only on phones. */
+.sidebar-toggle { display: none; }
+.sidebar-scrim { display: none; }
+
+@media (max-width: 720px) {
+  /* ---- Sidebar becomes an off-canvas drawer: the universe gets the full width ---- */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    height: auto;
+    z-index: 80;
+    width: min(300px, 85vw);
+    min-width: 0;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    transform: translateX(-105%);
+    transition: transform 0.28s cubic-bezier(0.22, 0.9, 0.3, 1);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 24px 0 60px rgba(0, 0, 0, 0.5);
+  }
+
+  .sidebar-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 75;
+    background: rgba(5, 7, 10, 0.55);
+    backdrop-filter: blur(2px);
+  }
+
+  .sidebar-toggle {
+    position: absolute;
+    top: calc(var(--sp-3) + env(safe-area-inset-top, 0px));
+    left: var(--sp-3);
+    z-index: 30;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(17, 22, 29, 0.82);
+    backdrop-filter: blur(14px);
+    border: 1px solid var(--line-strong);
+    color: var(--text-dim);
+    transition: color var(--t-fast), border-color var(--t-fast);
+  }
+  .sidebar-toggle:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ---- Universe overlays: top row clears the handle, filter takes row two ---- */
+  .galaxy-add {
+    top: calc(var(--sp-3) + env(safe-area-inset-top, 0px));
+    left: calc(var(--sp-3) + 52px);
+  }
+  .galaxy-vr-btn {
+    top: calc(var(--sp-3) + env(safe-area-inset-top, 0px));
+    right: var(--sp-3);
+  }
+  .galaxy-filter { top: calc(var(--sp-3) + 56px + env(safe-area-inset-top, 0px)); }
+
+  .galaxy-command { width: calc(100% - var(--sp-4)); }
+
+  /* ---- Conversation: the glass panel takes the whole stage ---- */
+  .conv-panel {
+    top: var(--sp-2);
+    left: var(--sp-2);
+    right: var(--sp-2);
+    width: auto;
+    bottom: calc(var(--sp-2) + var(--kb, 0px));
+  }
+  /* The drawer handle floats over the panel corner: keep the title clear of it */
+  .conv-panel .conv-head { padding: var(--sp-3) var(--sp-3) var(--sp-3) 64px; flex-wrap: wrap; }
+  .conv-stream { padding: var(--sp-3); }
+
+  /* ---- Command bar hugs the phone edges ---- */
+  .cmdbar-zone { width: calc(100% - var(--sp-4)); }
+  .cmdbar-presets {
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+  .cmdbar-presets::-webkit-scrollbar { display: none; }
+  .cmdbar-preset { flex: 0 0 auto; white-space: nowrap; }
+
+  /* ---- Work order sheet: single column, full-bleed card ---- */
+  .wo-overlay { padding: var(--sp-2); }
+  .wo-sheet { padding: var(--sp-4); gap: var(--sp-4); }
+  .wo-grid { grid-template-columns: 1fr; gap: var(--sp-4); }
+  .wo-head { flex-direction: column; }
+  .wo-head-right { align-items: flex-start; text-align: left; }
+  .wo-conf-reason { max-width: none; }
+
+  /* ---- Self-check report spans the width ---- */
+  .selfcheck { left: var(--sp-2); right: var(--sp-2); width: auto; }
+
+  /* The VR chip floats over the full-width chat header: universe views only */
+  .main:has(.conv-panel) .galaxy-vr-btn { display: none; }
+
+  /* ---- Page viewer: no fixed-height page (a portrait page at 84dvh would be
+     wider than the phone and the max-width clamp would distort it) ---- */
+  .cite-img-wrap.zoomed img {
+    width: auto;
+    height: auto;
+    max-width: 94vw;
+    max-height: 80dvh;
+  }
+  /* Docked mode has no universe half to share: behave as the full lightbox */
+  .cite-lightbox.docked {
+    left: 0;
+    background: rgba(5, 7, 10, 0.86);
+    padding: var(--sp-6) var(--sp-3);
+  }
+  .cite-lightbox.docked .cite-img-wrap.zoomed img {
+    max-width: 94vw;
+    height: auto;
+    max-height: 74dvh;
+  }
+  .cite-lightbox.docked .video-frame { width: min(94vw, calc(74dvh * 16 / 9)); }
+
+  /* Centered meta pill collides with the actions on a narrow screen:
+     left-align it and reserve the right side for Translate / actions */
+  .lightbox-meta,
+  .cite-lightbox.docked .lightbox-meta {
+    left: var(--sp-3);
+    transform: none;
+    max-width: calc(100vw - 160px);
+  }
+
+  /* Translation pane stacks under the page instead of beside it */
+  .lightbox-stage {
+    flex-direction: column;
+    align-items: center;
+    max-height: 88dvh;
+    overflow-y: auto;
+  }
+  .translate-pane { width: min(94vw, 700px); max-height: 38dvh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar { transition: none; }
+}

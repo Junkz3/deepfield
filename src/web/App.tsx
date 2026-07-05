@@ -26,7 +26,11 @@ function Shell() {
   const [studioQueue, setStudioQueue] = useState<File[]>([]);
   const [checkDocIds, setCheckDocIds] = useState<string[]>([]);
   const [catFilter, setCatFilter] = useState<string | null>(null);
+  const [navOpen, setNavOpen] = useState(false);
   const inConversation = state.activeView.kind === 'conversation';
+
+  // Phone drawer: any navigation puts the universe back in front.
+  useEffect(() => { setNavOpen(false); }, [state.activeView, state.studioOpen]);
 
   // Per-user upload quota (enterprise guardrail; also keeps a stray 600 MB
   // drop from freezing a demo). Counter follows the session docs' lifetime.
@@ -116,13 +120,29 @@ function Shell() {
 
   return (
     <div className="shell">
-      {!state.studioMode && <Sidebar />}
+      {!state.studioMode && <Sidebar open={navOpen} />}
+      {navOpen && !state.studioMode && (
+        <div className="sidebar-scrim" onClick={() => setNavOpen(false)} />
+      )}
       <main
         className={`main stage ${dragging ? 'dragging' : ''}`}
         onDragOver={(e) => { e.preventDefault(); if (!inConversation && !state.studioMode) setDragging(true); }}
         onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
         onDrop={inConversation || state.studioMode ? undefined : onDrop}
       >
+        {/* Phone-only (mobile.css): the drawer handle floats over everything. */}
+        {!state.studioMode && (
+          <button
+            className="sidebar-toggle"
+            aria-label={navOpen ? 'Hide navigation' : 'Show navigation'}
+            onClick={() => setNavOpen((o) => !o)}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
+              <path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
+
         {/* The universe is the permanent backdrop of everything. */}
         <Suspense fallback={<div className="galaxy-loading mono">Charting the knowledge universe…</div>}>
           <Galaxy3D
