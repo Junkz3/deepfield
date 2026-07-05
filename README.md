@@ -1,25 +1,46 @@
-# RepairCenter
+# <img src="public/favicon.svg" width="30" height="30" alt=""> Deepfield
 
-A manual-agnostic, document-grounded repair agent. Built solo in 24 hours for the RAISE Summit
-hackathon (Statement Two, Vultr track): every commit in this repo, from the first scaffold to
-the last polish, was written during the event.
+Drop any document corpus in, get a grounded enterprise agent out. Deepfield reads every page
+as an image (manuals, policies, scanned fold-outs, even videos), auto-organizes the files into
+a knowledge base rendered as a navigable 3D universe, and calibrates an agent workspace over
+it. The agent plans, retrieves the right pages visually, decides on its own when the evidence
+is not sufficient, calls the workspace's tools, and delivers verdicts with an explained
+confidence score. Every claim links to the exact page, table row, wiring fold-out or video
+second it came from.
 
-Drop in any repair documentation: service manuals, user guides, scanned military TMs, iFixit
-guides, even videos. The agent reads every page as an image, classifies each document, and
-auto-organizes the whole corpus into a knowledge base rendered as a navigable 3D universe of
-files. A technician then describes a fault in any language. The agent plans, retrieves the right
-pages visually, decides on its own when the evidence is not sufficient, reads schematics, calls
-tools (parts stock, measurements), and delivers a cited step-by-step repair path with an
-explained confidence score. Every claim links to the exact page, table row, wiring fold-out or
-video second it came from.
+Built solo in 24 hours for the RAISE Summit hackathon (Statement Two, Vultr track): every
+commit in this repo, from the first scaffold to the last polish, was written during the event.
 
-<img src="public/readme/universe.png" alt="The RepairCenter universe: 30 documents auto-organized into constellations by category, the agent core at the center">
+<img src="public/readme/universe.png" alt="The Deepfield universe: 30 documents auto-organized into constellations by category, the agent core at the center">
 
 *The corpus after ingest: every document classified and placed into constellations, the agent core at the center.*
 
 The 3D universe is not decoration: it is the retrieval made visible. When the agent searches,
 lightning probes the candidate files; when it cites, the real pages fan out in space; documents
 outside the conversation scope fade to ghosts.
+
+## Any corpus, any workflow: the Studio
+
+Nothing in the engine is domain-specific. Open the Studio (`/?studio`), name a workspace, drop
+a corpus, optionally state your intent in one sentence: calibration writes the whole workspace.
+Nemotron designs the agent team and its operations from the corpus and that sentence, and each
+request is routed to the right specialist inside the plan call itself, at zero extra inference
+cost. The same plan-retrieve-cite loop serves legal discovery, insurance claims review,
+clinical-trial matching or telecom field operations; the demo ships a second, insurance
+workspace born exactly this way, with a real two-agent team (coverage advisor and claims
+analyst) over six public policy documents.
+
+<img src="public/readme/studio.png" alt="Deepfield Studio: workspace name, workflow presets, agent team, corpus drop zone and tool operations over the live universe">
+
+*Deepfield Studio (`/?studio`): the workspace creation screen. The universe populates live behind the card as the corpus is selected.*
+
+## RepairCenter: the first Deepfield app, and the demo
+
+Drop in any repair documentation: service manuals, user guides, scanned military TMs, iFixit
+guides, even videos. A technician describes a fault in any language; the agent reads schematics
+and the technician's photos, calls the repair workspace's tools (parts stock, measurements),
+follows the manual's own cross-references like a technician would, and delivers a cited
+step-by-step repair path that compiles into a work order.
 
 <img src="public/readme/diagnosis.png" alt="A live diagnosis on Vultr: autonomous re-retrieval, a page-exact cited verdict with an explained 90 percent confidence, and the cited pages fanned out in the universe">
 
@@ -51,21 +72,6 @@ half a second) sends your words straight to the agent; with VOICE on, verdicts a
 through NVIDIA Magpie TTS Multilingual. Both ride a small gRPC relay (`tools/tts-relay/`, the
 hosted speech APIs are gRPC-only); if the relay is down, TTS falls back to Vultr, then to the
 browser, and the mic button hides rather than pretend.
-
-## <img src="public/favicon.svg" width="26" height="26" alt=""> Beyond repair: the Deepfield engine
-
-Nothing in the engine is repair-specific. Visual retrieval over page images, automatic
-taxonomy, the navigable 3D universe and page-exact citations work on any document corpus.
-RepairCenter is the first app built on Deepfield: open the Studio (`/?studio`), name a
-workspace, drop a corpus, wire your tools, and the same plan-retrieve-cite loop serves legal
-discovery, clinical-trial matching or telecom field operations. Calibration writes the whole
-workspace: Nemotron designs the agent team and its operations from the corpus and your intent
-sentence, and each request is routed to the right specialist inside the plan call itself, at
-zero extra inference cost.
-
-<img src="public/readme/studio.png" alt="Deepfield Studio: workspace name, workflow presets, agent team, corpus drop zone and tool operations over the live universe">
-
-*Deepfield Studio (`/?studio`): the workspace creation screen. The universe populates live behind the card as the corpus is selected.*
 
 ## Multilingual by design
 
@@ -114,7 +120,7 @@ in the app `.env` (generate one on build.nvidia.com).
 
 ## Corpus
 
-The demo universe ships 30 documents across 26 device categories, ingested at FULL depth
+The RepairCenter universe ships 30 documents across 26 device categories, ingested at FULL depth
 (thousands of pages): complete service and user manuals, military TMs, a repair video with
 chapter-accurate citations. Retrieval cost does not grow with corpus size: the two-stage
 design always sends at most 24 page images to the visual reranker per query. `npm run ingest`
