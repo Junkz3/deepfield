@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AuthStore } from './auth.mjs';
+import { AuthStore, STORE_MAX_BYTES } from './auth.mjs';
 
 const fresh = () => new AuthStore(mkdtempSync(join(tmpdir(), 'auth-test-')));
 
@@ -80,6 +80,33 @@ test('mail cooldown holds for a minute per account', () => {
   assert.equal(store.issueVerifyToken(r.userId), null);
   store.db.users['user@example.com'].lastMailAt = Date.now() - 61_000;
   assert.ok(store.issueVerifyToken(r.userId));
+});
+
+test('per-account store round-trips, is isolated, and enforces the size cap', () => {
+  const store = fresh();
+  const a = store.signup('a@example.com', 'password1').userId;
+  const b = store.signup('b@example.com', 'password1').userId;
+
+  // fresh account: empty JSON, never another account's data
+  assert.equal(store.readStore(a), '{}');
+
+  const convs = JSON.stringify({ conversations: { 'rc.conversations': [{ id: 'x', private: 'secret' }] } });
+  assert.equal(store.writeStore(a, convs).ok, true);
+  // round-trips for the owner
+  assert.equal(store.readStore(a), convs);
+  // isolation: b cannot see a's conversations, and a write by a never leaks to b
+  assert.equal(store.readStore(b), '{}');
+  store.writeStore(b, '{"conversations":{}}');
+  assert.equal(store.readStore(a), convs);
+
+  // survives a restart (atomic file on disk)
+  const reopened = new AuthStore(store.dir);
+  assert.equal(reopened.readStore(a), convs);
+
+  // rejects invalid JSON and anything over the cap, without corrupting what is stored
+  assert.equal(store.writeStore(a, 'not json').ok, false);
+  assert.equal(store.writeStore(a, 'x'.repeat(STORE_MAX_BYTES + 1)).ok, false);
+  assert.equal(store.readStore(a), convs);
 });
 
 test('state survives a restart, pre-verification accounts are grandfathered', () => {

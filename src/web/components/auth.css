@@ -100,5 +100,10 @@
   color: var(--text-dim);
 }
 .auth-chip-quota { color: var(--accent); }
+.auth-chip-sync {
+  color: var(--err);
+  padding-left: var(--sp-2);
+  border-left: 1px solid var(--line);
+}
 .auth-chip-out { color: var(--text-faint); }
 .auth-chip-out:hover { color: var(--err); }

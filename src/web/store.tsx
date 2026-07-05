@@ -451,9 +451,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .then((docs) => dispatch({ type: 'boot', docs }));
   }, []);
 
-  // Persist conversations, one key per workspace.
+  // Persist conversations, one key per workspace. The dirty event lets the
+  // AuthGate mirror the change to the private per-account server store within
+  // ~1.5s (debounced) instead of waiting for its periodic tick.
   useEffect(() => {
-    if (state.booted) localStorage.setItem(convKey(state.activeWorkspaceId), JSON.stringify(state.conversations));
+    if (state.booted) {
+      localStorage.setItem(convKey(state.activeWorkspaceId), JSON.stringify(state.conversations));
+      window.dispatchEvent(new Event('rc:store-dirty'));
+    }
   }, [state.booted, state.conversations, state.activeWorkspaceId]);
 
   // Persist the workspace manifest (light: no corpora). Ops serialize to
@@ -478,7 +483,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         team: w.team,
         opSpecs: w.ops.map(({ id, label, kind, cue, query }) => ({ id, label, kind, cue, query })),
       }));
-    try { localStorage.setItem(WS_KEY, JSON.stringify(list)); } catch { /* quota: manifest only, safe to skip */ }
+    try {
+      localStorage.setItem(WS_KEY, JSON.stringify(list));
+      window.dispatchEvent(new Event('rc:store-dirty'));
+    } catch { /* quota: manifest only, safe to skip */ }
   }, [state.booted, state.workspaces, state.activeWorkspaceId, state.workspaceName, state.team, state.ops, state.corpusDocs, state.previewBackup]);
 
   // Reload: rebuild seed-backed workspaces from the manifest, parked. The

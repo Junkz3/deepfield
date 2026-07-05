@@ -48,7 +48,13 @@ async function pullServerStore(): Promise<void> {
   } catch { /* offline store stays local */ }
 }
 
-function collectLocalStore(): string {
+/** Serialize the local store for the server mirror, or null when there is
+ *  nothing worth saving. Returning null (never an empty payload) is the safety
+ *  latch: a stray flush - a pagehide firing right after the store was cleared,
+ *  a boot before hydration - must NOT overwrite the account's server backup
+ *  with emptiness. An empty store means "nothing to back up yet", never
+ *  "erase what the server holds". */
+function collectLocalStore(): string | null {
   const conversations: Record<string, unknown> = {};
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
@@ -56,8 +62,10 @@ function collectLocalStore(): string {
       try { conversations[k] = JSON.parse(localStorage.getItem(k) ?? 'null'); } catch { /* skip */ }
     }
   }
-  let workspaces: unknown = [];
-  try { workspaces = JSON.parse(localStorage.getItem(WS_KEY) ?? '[]'); } catch { /* skip */ }
+  let workspaces: unknown[] = [];
+  try { const w = JSON.parse(localStorage.getItem(WS_KEY) ?? '[]'); if (Array.isArray(w)) workspaces = w; } catch { /* skip */ }
+  const hasConversations = Object.values(conversations).some((v) => Array.isArray(v) && v.length > 0);
+  if (!hasConversations && workspaces.length === 0) return null;
   return JSON.stringify({ workspaces, conversations, savedAt: new Date().toISOString() });
 }
 
@@ -277,7 +285,10 @@ function VerifyScreen({ email, linkFailed, onVerified }: {
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<Phase>({ kind: 'checking' });
-  const pushTimer = useRef<number | null>(null);
+  // Server-mirror health: 'error' means the server rejected the store (over
+  // its size cap), so local changes are NOT being backed up: worth surfacing.
+  // 'offline' is a transient network blip and stays silent.
+  const [syncState, setSyncState] = useState<'ok' | 'offline' | 'error' | null>(null);
   const authParams = useRef(readAuthParams());
 
   const check = useCallback(async () => {
@@ -304,18 +315,62 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   useEffect(() => { void check(); }, [check]);
 
-  // Signed in: sync the light manifest to the account store periodically
-  // and on exit - your workspaces follow your account across browsers.
+  // Signed in: mirror the local store to the private per-account server store.
+  // Event-driven and debounced so a new conversation lands in ~1.5s instead of
+  // waiting up to 20s; a periodic tick and a keepalive flush on pagehide are
+  // the safety net. Your conversations follow your account across browsers.
   useEffect(() => {
     if (phase.kind !== 'in') return;
-    const push = () => {
-      void fetch('/api/me/store', { method: 'PUT', body: collectLocalStore() }).catch(() => { /* retry next tick */ });
+    let inFlight = false;
+    let dirtyWhileInFlight = false;
+    let debounce: number | null = null;
+
+    const flush = async () => {
+      // Coalesce: never overlap PUTs. A change arriving mid-flight re-arms the
+      // debounce from the finally block, so nothing is dropped.
+      if (inFlight) { dirtyWhileInFlight = true; return; }
+      const body = collectLocalStore();
+      if (body === null) return; // empty store: never overwrite the server backup
+      inFlight = true;
+      try {
+        const r = await fetch('/api/me/store', { method: 'PUT', body });
+        // A non-ok status (store over the size cap -> 400/500) does NOT reject
+        // a fetch, so it would otherwise pass silently. Surface it instead.
+        setSyncState(r.ok ? 'ok' : 'error');
+      } catch {
+        setSyncState('offline'); // network blip: transient, the next tick retries
+      } finally {
+        inFlight = false;
+        if (dirtyWhileInFlight) { dirtyWhileInFlight = false; schedule(); }
+      }
     };
-    pushTimer.current = window.setInterval(push, 20_000);
-    window.addEventListener('beforeunload', push);
+
+    const schedule = () => {
+      if (debounce !== null) window.clearTimeout(debounce);
+      debounce = window.setTimeout(() => { debounce = null; void flush(); }, 1500);
+    };
+
+    const onDirty = () => schedule();
+    // Best-effort flush when the tab goes away. keepalive lets the request
+    // outlive the page (unlike a plain fetch on beforeunload); it is capped at
+    // ~64KB by the browser, but the debounced flush above has almost certainly
+    // already synced the latest change.
+    const onPageHide = () => {
+      const body = collectLocalStore();
+      if (body === null) return; // empty store: never overwrite the server backup
+      try {
+        void fetch('/api/me/store', { method: 'PUT', body, keepalive: true });
+      } catch { /* nothing more we can do at unload */ }
+    };
+
+    window.addEventListener('rc:store-dirty', onDirty);
+    window.addEventListener('pagehide', onPageHide);
+    const iv = window.setInterval(() => void flush(), 20_000);
     return () => {
-      if (pushTimer.current !== null) window.clearInterval(pushTimer.current);
-      window.removeEventListener('beforeunload', push);
+      window.removeEventListener('rc:store-dirty', onDirty);
+      window.removeEventListener('pagehide', onPageHide);
+      window.clearInterval(iv);
+      if (debounce !== null) window.clearTimeout(debounce);
     };
   }, [phase.kind]);
 
@@ -352,6 +407,14 @@ export function AuthGate({ children }: { children: ReactNode }) {
         <div className="auth-chip mono" title="Daily inference budget on this account">
           <span className="auth-chip-mail">{phase.email}</span>
           {phase.quota && <span className="auth-chip-quota">{phase.quota.used}/{phase.quota.limit} today</span>}
+          {syncState === 'error' && (
+            <span
+              className="auth-chip-sync"
+              title="Server backup paused: this account's store is over its size limit. Recent changes are saved on this device only."
+            >
+              sync paused
+            </span>
+          )}
           <button
             className="auth-chip-out"
             title="Sign out"

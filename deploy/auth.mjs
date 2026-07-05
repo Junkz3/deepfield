@@ -11,6 +11,10 @@ const VERIFY_TTL_MS = 24 * 3600 * 1000;
 const RESET_TTL_MS = 3600 * 1000;
 const MAIL_COOLDOWN_MS = 60 * 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Per-account store cap. Conversations (with attachments) grew past the old
+// 2 MB ceiling and got silently rejected; 8 MB covers a heavy demo account.
+// Exported so the HTTP body limit and the tests stay aligned with it.
+export const STORE_MAX_BYTES = 8 * 1024 * 1024;
 
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
@@ -228,7 +232,7 @@ export class AuthStore {
 
   /** @returns {{ok: boolean, error?: string}} */
   writeStore(userId, raw) {
-    if (typeof raw !== 'string' || raw.length > 2 * 1024 * 1024) return { ok: false, error: 'store too large (2 MB cap)' };
+    if (typeof raw !== 'string' || raw.length > STORE_MAX_BYTES) return { ok: false, error: 'store too large (8 MB cap)' };
     try { JSON.parse(raw); } catch { return { ok: false, error: 'store must be valid JSON' }; }
     const p = this.storePath(userId);
     writeFileSync(`${p}.tmp`, raw);

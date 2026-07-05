@@ -9,7 +9,7 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { AuthStore, clearSessionCookie, parseCookies, sessionCookie } from './auth.mjs';
+import { AuthStore, clearSessionCookie, parseCookies, sessionCookie, STORE_MAX_BYTES } from './auth.mjs';
 import { sendMail } from './mailer.mjs';
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -236,7 +236,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       if (req.method === 'PUT') {
-        const r = auth.writeStore(sessionUser, await readBody(req, 2 * 1024 * 1024 + 1024));
+        const r = auth.writeStore(sessionUser, await readBody(req, STORE_MAX_BYTES + 1024));
         json(res, r.ok ? 200 : 400, r.ok ? { ok: true } : { error: r.error });
         return;
       }
