@@ -13,7 +13,7 @@
   /* Text */
   --text: #dee7ef;
   --text-dim: #8b99a8;
-  --text-faint: #5c6875;
+  --text-faint: #6e7d8d;  /* ~4.6:1 on --bg0 (WCAG AA), still clearly below --text-dim */
 
   /* The agent = a warm work light at the center of the galaxy */
   --accent: #ffb454;
