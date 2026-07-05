@@ -15,13 +15,16 @@ npx vite preview            # serves dist/ WITH the /api/agent proxy (demo captu
 npx vitest run              # unit tests
 npm run demo                # offline scripted agent run in the terminal (FakeDriver)
 npm run ingest              # rebuild public/corpus/ from corpus/manifest.json
+npm run smoke               # live smoke test against the real Vultr endpoint
 node deploy/server.mjs      # the production server (see deploy/ for the VM story)
 ```
 
 Browser modes: `?driver=vultr` (default, live) / `?driver=fake` (offline script);
-`?studio` boots into the workspace creation screen. `.env` holds
-`VULTR_INFERENCE_API_KEY` and is git-ignored; never commit it, never expose it
-client-side.
+`?studio` boots into the workspace creation screen. `.env` is git-ignored and holds
+`VULTR_INFERENCE_API_KEY` (+ `VULTR_BASE_URL`, and `NVIDIA_API_KEY` for the speech
+relay); never commit it, never expose it client-side. Voice (mic button + TTS) needs
+the relay running: `cd tools/tts-relay && ./venv/bin/python serve.py`; without it
+the mic button is hidden and TTS falls back to Vultr, then the browser.
 
 ## Architecture in one breath
 
