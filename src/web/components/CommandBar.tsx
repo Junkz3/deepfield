@@ -84,8 +84,8 @@ export function CommandBar() {
           className="cmdbar-input"
           placeholder={
             (state.team.find((a) => a.active) ?? state.team[0])?.profile.decisionMode === 'answer'
-              ? "Ask the agent: 'Is a cracked windscreen covered by my policy?' or any question about the documents"
-              : "Ask the agent: 'Whirlpool dishwasher: error E3, no heat' or any question about the universe"
+              ? 'Ask about a claim, or anything in the documents'
+              : 'Describe a fault, or ask anything about the universe'
           }
           value={text}
           enterKeyHint="send"
