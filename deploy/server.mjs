@@ -10,6 +10,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { AuthStore, clearSessionCookie, parseCookies, sessionCookie } from './auth.mjs';
+import { sendMail } from './mailer.mjs';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const DIST = process.env.DIST ?? 'dist';
@@ -30,6 +31,42 @@ const auth = AUTH_ENABLED
   })
   : null;
 if (!KEY) { console.error('VULTR_INFERENCE_API_KEY is required'); process.exit(1); }
+
+// Transactional mail (email verification, password reset) rides the SMTP
+// submission port of an existing relay; SPF/DKIM/DMARC live there. Without
+// SMTP configured, signups are auto-verified so a bare deployment still works.
+const SMTP = {
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT ?? 465),
+  user: process.env.SMTP_USER,
+  pass: process.env.SMTP_PASS,
+  from: process.env.MAIL_FROM ?? 'noreply@repairmind.io',
+  fromName: 'Deepfield',
+};
+const MAIL_ENABLED = Boolean(SMTP.host && SMTP.user && SMTP.pass);
+const ORIGIN = process.env.APP_ORIGIN ?? 'https://deepfield.repairmind.io';
+if (AUTH_ENABLED && !MAIL_ENABLED) console.warn('SMTP_* not set: signups will be auto-verified, password reset disabled');
+
+async function sendAuthMail(kind, to, token) {
+  const msg = kind === 'verify'
+    ? {
+      to,
+      subject: 'Verify your email for Deepfield',
+      text: `Welcome to Deepfield.\n\nConfirm this email address to unlock the agent on your account:\n\n  ${ORIGIN}/api/auth/verify?token=${token}\n\nThe link is valid for 24 hours. If you did not create this account, you can ignore this message.\n`,
+    }
+    : {
+      to,
+      subject: 'Reset your Deepfield password',
+      text: `Someone asked to reset the password for this Deepfield account.\n\nSet a new password here:\n\n  ${ORIGIN}/?reset=${token}\n\nThe link is valid for 1 hour and works once. If this was not you, you can ignore this message: your password is unchanged.\n`,
+    };
+  try {
+    await sendMail(/** @type {any} */ (SMTP), msg);
+    return true;
+  } catch (e) {
+    console.error(`mail ${kind} to ${to} failed:`, e instanceof Error ? e.message : e);
+    return false;
+  }
+}
 
 const json = (res, code, body, headers = {}) => {
   res.writeHead(code, { 'content-type': 'application/json', ...headers });
@@ -82,6 +119,7 @@ const server = createServer(async (req, res) => {
     // --- accounts (only when AUTH_ENABLED=1) ---
     if (auth && url.pathname.startsWith('/api/auth/') && req.method === 'POST') {
       if (limited(ip)) { json(res, 429, { error: 'rate limited' }); return; }
+      const secure = req.headers['x-forwarded-proto'] === 'https';
       let payload = {};
       try { payload = JSON.parse(await readBody(req, 64 * 1024)); } catch { /* empty body is fine for logout */ }
       if (url.pathname === '/api/auth/signup' || url.pathname === '/api/auth/login') {
@@ -89,12 +127,46 @@ const server = createServer(async (req, res) => {
           ? auth.signup(payload.email, payload.password)
           : auth.login(payload.email, payload.password);
         if (!r.ok) { json(res, r.code, { error: r.error }); return; }
-        json(res, 200, { email: String(payload.email).trim().toLowerCase() }, {
-          'set-cookie': sessionCookie(auth.issueSession(r.userId), req.headers['x-forwarded-proto'] === 'https'),
+        const email = String(payload.email).trim().toLowerCase();
+        if ('verifyToken' in r) {
+          // Fresh signup: prove the mailbox before the agent unlocks. With no
+          // relay configured the account is usable right away instead.
+          if (MAIL_ENABLED) await sendAuthMail('verify', email, r.verifyToken);
+          else auth.verifyEmail(r.verifyToken);
+        }
+        json(res, 200, { email, verified: auth.infoOf(r.userId)?.verified === true }, {
+          'set-cookie': sessionCookie(auth.issueSession(r.userId), secure),
         });
         return;
       }
       if (url.pathname === '/api/auth/logout') {
+        auth.revokeSession(parseCookies(req.headers.cookie).rc_session);
+        json(res, 200, { ok: true }, { 'set-cookie': clearSessionCookie });
+        return;
+      }
+      if (url.pathname === '/api/auth/resend') {
+        if (!sessionUser) { json(res, 401, { error: 'sign in first' }); return; }
+        const info = auth.infoOf(sessionUser);
+        if (!info) { json(res, 401, { error: 'sign in first' }); return; }
+        if (info.verified) { json(res, 200, { ok: true, verified: true }); return; }
+        const token = auth.issueVerifyToken(sessionUser);
+        // No token means the cooldown is active; the mail already went out.
+        if (token && MAIL_ENABLED) await sendAuthMail('verify', info.email, token);
+        json(res, 200, { ok: true, verified: false });
+        return;
+      }
+      if (url.pathname === '/api/auth/request-reset') {
+        // Always 200 so responses never reveal whether an account exists.
+        const token = auth.issueResetToken(payload.email);
+        if (token && MAIL_ENABLED) {
+          await sendAuthMail('reset', String(payload.email).trim().toLowerCase(), token);
+        }
+        json(res, 200, { ok: true });
+        return;
+      }
+      if (url.pathname === '/api/auth/reset') {
+        const r = auth.resetPassword(payload.token, payload.password);
+        if (!r.ok) { json(res, r.code, { error: r.error }); return; }
         json(res, 200, { ok: true }, { 'set-cookie': clearSessionCookie });
         return;
       }
@@ -102,10 +174,20 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // The link in the verification email lands here, then back in the app.
+    if (auth && url.pathname === '/api/auth/verify' && req.method === 'GET') {
+      if (limited(ip)) { json(res, 429, { error: 'rate limited' }); return; }
+      const r = auth.verifyEmail(url.searchParams.get('token') ?? '');
+      res.writeHead(302, { location: r.ok ? '/?verified=1' : '/?verified=0' });
+      res.end();
+      return;
+    }
+
     if (url.pathname === '/api/me' && req.method === 'GET') {
       if (!auth) { json(res, 200, { auth: false }); return; }
-      if (!sessionUser) { json(res, 401, { auth: true }); return; }
-      json(res, 200, { auth: true, email: auth.emailOf(sessionUser), quota: auth.usageOf(sessionUser) });
+      const info = sessionUser ? auth.infoOf(sessionUser) : null;
+      if (!info) { json(res, 401, { auth: true }); return; }
+      json(res, 200, { auth: true, email: info.email, verified: info.verified, quota: auth.usageOf(sessionUser) });
       return;
     }
 
@@ -127,8 +209,12 @@ const server = createServer(async (req, res) => {
       if (limited(ip)) { res.writeHead(429).end('rate limited'); return; }
       const { path, body, token } = JSON.parse(await readBody(req));
       if (auth) {
-        // Signed-in users only, inside their daily budget.
+        // Signed-in, email-verified users only, inside their daily budget.
         if (!sessionUser) { json(res, 401, { error: 'sign in to use the agent' }); return; }
+        if (auth.infoOf(sessionUser)?.verified !== true) {
+          json(res, 403, { error: 'verify your email to use the agent' });
+          return;
+        }
         const q = auth.consume(sessionUser);
         if (!q.allowed) { json(res, 429, { error: q.reason }); return; }
       } else if (DEMO_TOKEN && token !== DEMO_TOKEN) {

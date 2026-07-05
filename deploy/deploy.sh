@@ -24,11 +24,13 @@ SETUP
 
 echo "== sync artifacts =="
 rsync -az --delete dist "$HOST:$APP_DIR/"
-rsync -az deploy/server.mjs deploy/auth.mjs "$HOST:$APP_DIR/deploy/"
+rsync -az deploy/server.mjs deploy/auth.mjs deploy/mailer.mjs deploy/backup.sh "$HOST:$APP_DIR/deploy/"
 rsync -az .env "$HOST:$APP_DIR/.env"
 rsync -az tools/tts-relay/serve.py tools/tts-relay/requirements.txt "$HOST:$APP_DIR/tts-relay/"
 rsync -az deploy/repaircenter.service "$HOST:/etc/systemd/system/repaircenter.service"
 rsync -az deploy/tts-relay.service "$HOST:/etc/systemd/system/tts-relay.service"
+rsync -az deploy/repaircenter-backup.service "$HOST:/etc/systemd/system/repaircenter-backup.service"
+rsync -az deploy/repaircenter-backup.timer "$HOST:/etc/systemd/system/repaircenter-backup.timer"
 
 echo "== (re)start =="
 ssh "$HOST" bash -s <<'START'
@@ -44,11 +46,20 @@ rm -f /opt/repaircenter/.env.tmp
   python3 -m venv /opt/repaircenter/tts-relay/venv
 }
 /opt/repaircenter/tts-relay/venv/bin/pip install -q -r /opt/repaircenter/tts-relay/requirements.txt
+# offsite backup identity: generated once on the VM, never leaves it. The
+# public half must be authorized on the BACKUP_REMOTE host (see backup.sh).
+[ -f /opt/repaircenter/.ssh/backup_ed25519 ] || {
+  mkdir -p /opt/repaircenter/.ssh
+  ssh-keygen -t ed25519 -N '' -C repaircenter-backup -f /opt/repaircenter/.ssh/backup_ed25519 >/dev/null
+  echo "new backup key, authorize it on the backup host:"
+  cat /opt/repaircenter/.ssh/backup_ed25519.pub
+}
 chown -R repaircenter:repaircenter /opt/repaircenter
 # port 80 needs the capability, not root
 setcap 'cap_net_bind_service=+ep' "$(command -v node)"
 systemctl daemon-reload
 systemctl enable --now repaircenter tts-relay
+systemctl enable --now repaircenter-backup.timer
 systemctl restart repaircenter tts-relay
 sleep 1
 systemctl --no-pager --lines=5 status repaircenter tts-relay

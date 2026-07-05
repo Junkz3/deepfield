@@ -109,9 +109,14 @@ The production target is a plain Vultr Cloud Compute VM, one command:
 inference proxy allowlist, and optional multi-user mode. With `AUTH_ENABLED=1` in `.env`,
 anyone can create an account and test within a per-account daily inference budget
 (`USER_DAILY_LIMIT`, default 150 calls) under a global ceiling (`GLOBAL_DAILY_LIMIT`);
-passwords are scrypt-hashed, sessions are HMAC-signed HttpOnly cookies, and each account
-gets a small server-side store so its workspaces follow it across browsers. Prefer a
-private link instead? Set `DEMO_TOKEN=<secret>` and share `http://<vm-ip>/?key=<secret>`.
+passwords are scrypt-hashed, sessions are opaque server-side tokens (logout and password
+reset revoke them for real), and each account gets a small server-side store so its
+workspaces follow it across browsers. With `SMTP_*` set in `.env` (any submission relay),
+signups require email verification before the agent unlocks, and password reset works by
+mail through the same zero-dependency SMTP client (`deploy/mailer.mjs`). An hourly
+systemd timer snapshots the account data and rsyncs it to an offsite host
+(`BACKUP_REMOTE`). Prefer a private link instead? Set `DEMO_TOKEN=<secret>` and share
+`http://<vm-ip>/?key=<secret>`.
 On a fresh Vultr Ubuntu image, open the web ports once: `ufw allow 80/tcp && ufw allow 443/tcp`.
 
 Voice is optional and runs on the NVIDIA speech relay: `cd tools/tts-relay && python -m venv venv
@@ -153,11 +158,12 @@ and the whole agent sits behind two seams (`ModelDriver` for inference, one `doc
 fetch for the corpus). Making it enterprise-ready is perimeter work, not a rewrite:
 
 - **Identity and organizations.** The demo deployment already ships real accounts:
-  `AUTH_ENABLED=1` on the VM server turns on signup/login (scrypt, HMAC-signed sessions),
-  a per-user store that follows the account across browsers, and per-account daily
-  inference quotas. The enterprise step up is an IdP (Keycloak self-hosted, or WorkOS for
-  SSO/SAML) with organizations owning workspaces and role-based membership (admin,
-  technician, viewer).
+  `AUTH_ENABLED=1` on the VM server turns on signup/login (scrypt password hashes,
+  revocable server-side sessions), strict email verification, password reset by mail,
+  a per-user store that follows the account across browsers, per-account daily
+  inference quotas, and hourly offsite backups of the account data. The enterprise
+  step up is an IdP (Keycloak self-hosted, or WorkOS for SSO/SAML) with organizations
+  owning workspaces and role-based membership (admin, technician, viewer).
 - **Database: Vultr Managed PostgreSQL.** The schema is already drawn by the code:
   `workspaces(id, org_id, name, team JSONB, ops JSONB)` is the in-app `WorkspaceSnapshot`,
   conversations persist their steps with the full reasoning timeline (a structured audit

@@ -1,0 +1,7 @@
+[Unit]
+Description=RepairCenter data backup (local tar + offsite rsync)
+
+[Service]
+Type=oneshot
+User=repaircenter
+ExecStart=/opt/repaircenter/deploy/backup.sh
