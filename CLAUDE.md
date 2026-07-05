@@ -79,6 +79,12 @@ systemd, port 80 via setcap). The local `.env` is rsynced to the server as-is:
 `AUTH_ENABLED=1` turns on public signup with per-account daily inference quotas
 (`USER_DAILY_LIMIT`, `GLOBAL_DAILY_LIMIT`, store under `/opt/repaircenter/data/`);
 `DEMO_TOKEN=<secret>` is the private-link alternative (`/?key=<secret>`).
+With `SMTP_*` + `MAIL_FROM` + `APP_ORIGIN` in `.env`, signups require email
+verification (strict: the agent stays 403 until verified) and password reset works
+by mail (`deploy/mailer.mjs`, zero-dep SMTP over implicit TLS; 60s per-account mail
+cooldown, silent by design). Sessions are server-side and revocable. An hourly
+`repaircenter-backup.timer` tars `data/` and rsyncs to `BACKUP_REMOTE` (dedicated
+key in `/opt/repaircenter/.ssh/`). Unit tests: `node --test deploy/auth.test.mjs`.
 Two deployment lessons: `deploy/auth.mjs` must ship next to `server.mjs` (the
 service import-crashes without it - the script now syncs both), and fresh
 Vultr Ubuntu images firewall everything but SSH: `ufw allow 80/tcp` once.
