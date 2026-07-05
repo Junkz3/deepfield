@@ -40,14 +40,16 @@
   letter-spacing: 0.08em;
 }
 
-/* Keycap hint for the walkie-talkie shortcut. */
+/* Keycap hint for the walkie-talkie shortcut: a quiet reminder that sits right
+   against the mic (its shortcut), not a control competing for attention. */
 .voice-key {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-faint);
-  border: 1px solid var(--line-strong);
-  border-bottom-width: 2px;
+  border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 1px 5px;
-  letter-spacing: 0.08em;
+  padding: 1px 4px;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
   user-select: none;
+  margin-right: -4px; /* tuck toward the mic so they read as one unit */
 }
