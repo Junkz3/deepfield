@@ -872,7 +872,9 @@
 
 /* Offline-script banner: impossible to mistake a scripted demo for live. */
 .conv-offline {
-  margin: var(--sp-2) var(--sp-4) 0;
+  /* sp-5 sides so the banner registers with the head title and step cards
+     (both inset by conv-head / conv-stream padding of sp-5), not 8px left of them */
+  margin: var(--sp-2) var(--sp-5) 0;
   padding: 6px 12px;
   border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
   border-radius: var(--radius-sm);
