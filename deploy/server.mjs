@@ -110,7 +110,7 @@ const json = (res, code, body, headers = {}) => {
   res.end(JSON.stringify(body));
 };
 
-const ALLOWED_PATHS = new Set(['/chat/completions', '/rerank']);
+const ALLOWED_PATHS = new Set(['/chat/completions', '/rerank', '/audio/speech']);
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css',
   '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg',
@@ -264,8 +264,11 @@ const server = createServer(async (req, res) => {
         headers: { authorization: `Bearer ${KEY}`, 'content-type': 'application/json' },
         body: JSON.stringify(body),
       });
-      res.writeHead(upstream.status, { 'content-type': 'application/json' });
-      res.end(await upstream.text());
+      // Relay the upstream content-type and raw bytes: /audio/speech streams
+      // binary audio, so text() + a forced application/json would corrupt it.
+      // JSON paths (/chat/completions, /rerank) pass through byte-identical.
+      res.writeHead(upstream.status, { 'content-type': upstream.headers.get('content-type') ?? 'application/json' });
+      res.end(Buffer.from(await upstream.arrayBuffer()));
       return;
     }
 
