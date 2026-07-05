@@ -11,9 +11,11 @@
 <p align="center">
   <a href="https://deepfield.repairmind.io"><img src="https://img.shields.io/badge/live-deepfield.repairmind.io-ffb454" alt="Live demo"></a>
   <a href="https://github.com/Junkz3/deepfield/stargazers"><img src="https://img.shields.io/github/stars/Junkz3/deepfield?style=flat&color=ffb454" alt="GitHub stars"></a>
-  <img src="https://img.shields.io/badge/RAISE%20Summit-Vultr%20track-63d1de" alt="RAISE Summit, Vultr track">
-  <img src="https://img.shields.io/badge/inference-NVIDIA%20Nemotron-76b900" alt="NVIDIA Nemotron">
-  <img src="https://img.shields.io/badge/built-React%20%2B%20Three.js-61dafb" alt="React and Three.js">
+  <a href="https://www.raisesummit.com/fr/hackathon"><img src="https://img.shields.io/badge/RAISE%20Summit-hackathon-63d1de" alt="RAISE Summit hackathon"></a>
+  <a href="https://www.vultr.com"><img src="https://img.shields.io/badge/track-Vultr-007bfc" alt="Vultr track"></a>
+  <a href="https://build.nvidia.com"><img src="https://img.shields.io/badge/inference-NVIDIA%20Nemotron-76b900" alt="NVIDIA Nemotron"></a>
+  <a href="https://react.dev"><img src="https://img.shields.io/badge/React-61dafb" alt="React"></a>
+  <a href="https://threejs.org"><img src="https://img.shields.io/badge/Three.js-000000" alt="Three.js"></a>
 </p>
 
 Drop any document corpus in, get a grounded enterprise agent out. Deepfield reads every page
