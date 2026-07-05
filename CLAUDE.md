@@ -71,6 +71,18 @@ the mic button is hidden and TTS falls back to Vultr, then the browser.
 - `public/corpus*` is a build artifact (not versioned). The full-corpus
   docs.json is tens of MB: keep it out of git and let the server gzip it.
 
+## Production VM (live at http://140.82.52.6)
+
+`./deploy/deploy.sh root@<vm-ip>` does everything (build, node install, rsync,
+systemd, port 80 via setcap). The local `.env` is rsynced to the server as-is:
+`AUTH_ENABLED=1` turns on public signup with per-account daily inference quotas
+(`USER_DAILY_LIMIT`, `GLOBAL_DAILY_LIMIT`, store under `/opt/repaircenter/data/`);
+`DEMO_TOKEN=<secret>` is the private-link alternative (`/?key=<secret>`).
+Two deployment lessons: `deploy/auth.mjs` must ship next to `server.mjs` (the
+service import-crashes without it - the script now syncs both), and fresh
+Vultr Ubuntu images firewall everything but SSH: `ufw allow 80/tcp` once.
+SSH password auth is disabled on the VM; access is key-only.
+
 ## Testing discipline
 
 Unit tests (`vitest`) cover the deterministic engine. Prompt or retrieval

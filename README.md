@@ -91,6 +91,23 @@ With a Vultr Serverless Inference key the same UI runs live: put the key in `.en
 the production proxy in `functions/api/agent.ts`) forwards only `/chat/completions` and
 `/rerank`; the key never reaches the browser.
 
+## Deploy it (live demo: http://140.82.52.6)
+
+The production target is a plain Vultr Cloud Compute VM, one command:
+
+```
+./deploy/deploy.sh root@<vm-ip>   # build, sync, systemd service, port 80
+```
+
+`deploy/server.mjs` is a zero-dependency Node server: static build, gzip, the same
+inference proxy allowlist, and optional multi-user mode. With `AUTH_ENABLED=1` in `.env`,
+anyone can create an account and test within a per-account daily inference budget
+(`USER_DAILY_LIMIT`, default 150 calls) under a global ceiling (`GLOBAL_DAILY_LIMIT`);
+passwords are scrypt-hashed, sessions are HMAC-signed HttpOnly cookies, and each account
+gets a small server-side store so its workspaces follow it across browsers. Prefer a
+private link instead? Set `DEMO_TOKEN=<secret>` and share `http://<vm-ip>/?key=<secret>`.
+On a fresh Vultr Ubuntu image, open the web ports once: `ufw allow 80/tcp && ufw allow 443/tcp`.
+
 Voice is optional and runs on the NVIDIA speech relay: `cd tools/tts-relay && python -m venv venv
 && venv/bin/pip install -r requirements.txt && venv/bin/python serve.py`, with `NVIDIA_API_KEY`
 in the app `.env` (generate one on build.nvidia.com).
