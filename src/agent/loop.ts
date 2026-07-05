@@ -1,4 +1,5 @@
 import type { Conversation, Diagnosis, Document, GuidedStep, PartLine, PhaseEvent, SafetyInfo, ScoredPage, WorkOrder } from './types';
+import { FREEFORM_SYMPTOM } from './types';
 import type { ModelDriver } from './driver';
 import { candidatePages, pageTitle, scopeSummary, trimPool } from './taxonomy';
 import { activeTools } from './tools';
@@ -199,11 +200,41 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   // sufficiency judge named come first (same rule as answer), accumulation
   // order for the rest.
   yield emit({ phase: 'reason', summary: 'Reading the retrieved pages' + (conversation.attachments.length > 0 ? ' and your photo' : '') });
-  const evidenceOrder = keyPages.length > 0
+  let evidenceOrder = keyPages.length > 0
     ? [...retrieved.filter((r) => keyPages.includes(r.page.page)), ...retrieved.filter((r) => !keyPages.includes(r.page.page))]
     : retrieved;
-  const diagnosis = await driver.diagnose(q, evidenceOrder.map((r) => r.page), conversation.attachments[0]?.dataUrl);
+  let diagnosis = await driver.diagnose(q, evidenceOrder.map((r) => r.page), conversation.attachments[0]?.dataUrl);
   yield emit({ phase: 'reason', summary: `Likely fault: ${diagnosis.component}`, detail: diagnosis.cause });
+
+  // SECOND LOOK. An "insufficient evidence" verdict with pages in hand is
+  // often a retrieval bias, not a corpus gap (measured on the bench: a plan
+  // query carrying the device name crowns the pages that DISPLAY that name,
+  // covers and title pages, over the fault table - Brother "Jam Rear" read
+  // four covers and surrendered while the error table sat at rank 6). The
+  // scope already encodes the device, so before the honest no-evidence step,
+  // retry ONCE with the bare symptom over the pages not yet read.
+  if (/insufficient|insuffisan/i.test(diagnosis.component)) {
+    const bareQuery = conversation.symptom === FREEFORM_SYMPTOM ? conversation.device : conversation.symptom;
+    const pool = candidates.filter((p) => !retrieved.some((r) => r.page.docId === p.docId && r.page.page === p.page));
+    yield emit({ phase: 'retrieve', summary: `Second look: searching "${bareQuery}" beyond the pages already read` });
+    try {
+      const second = await driver.retrieve(bareQuery, trimPool(bareQuery, pool));
+      const extra = second
+        .filter((r) => r.score >= 1.5 && !retrieved.some((x) => x.page.docId === r.page.docId && x.page.page === r.page.page))
+        .slice(0, 4);
+      if (extra.length > 0) {
+        yield emit({
+          phase: 'retrieve', summary: `Second look retained ${extra.length} new page(s)`,
+          hitPages: extra.map((t) => ({ docId: t.page.docId, page: t.page.page })),
+          citations: extra.map(toCitation),
+        });
+        evidenceOrder = [...extra, ...evidenceOrder];
+        retrieved.push(...extra);
+        diagnosis = await driver.diagnose(q, evidenceOrder.map((r) => r.page), conversation.attachments[0]?.dataUrl);
+        yield emit({ phase: 'reason', summary: `Likely fault: ${diagnosis.component}`, detail: diagnosis.cause });
+      }
+    } catch { /* the second look is best-effort: fall through to the honest no-evidence step */ }
+  }
 
   // The model refusing to invent IS a feature: when the pages truly do not
   // support a diagnosis (index pages pointing at procedures not in the KB),
