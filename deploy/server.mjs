@@ -13,6 +13,9 @@ import { AuthStore, clearSessionCookie, parseCookies, sessionCookie, STORE_MAX_B
 import { sendMail } from './mailer.mjs';
 
 const PORT = Number(process.env.PORT ?? 8080);
+// Bind loopback by default: a reverse proxy (Caddy) fronts us on the same host.
+// Override with BIND_HOST=0.0.0.0 only if the app must be reached directly.
+const HOST = process.env.BIND_HOST ?? '127.0.0.1';
 const DIST = process.env.DIST ?? 'dist';
 const KEY = process.env.VULTR_INFERENCE_API_KEY;
 const BASE = process.env.VULTR_BASE_URL ?? 'https://api.vultrinference.com/v1';
@@ -353,4 +356,4 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log(`Deepfield serving ${DIST} on :${PORT}`));
+server.listen(PORT, HOST, () => console.log(`Deepfield serving ${DIST} on ${HOST}:${PORT}`));
