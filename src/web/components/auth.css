@@ -18,11 +18,8 @@
 }
 
 .auth-mark {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, var(--accent), transparent 70%);
-  border: 1px solid var(--line-strong);
+  display: block;
+  line-height: 0;
   margin-bottom: var(--sp-2);
 }
 

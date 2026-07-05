@@ -18,13 +18,14 @@ function toWireBody(text) {
 }
 
 /**
- * Send one plain-text message. Resolves on 250 after DATA, rejects on any
- * unexpected reply, TLS failure or timeout. No retries here: callers decide
- * whether a send is worth retrying (auth mail is; a resend button exists).
+ * Send one message, plain text with an optional HTML alternative part.
+ * Resolves on 250 after DATA, rejects on any unexpected reply, TLS failure
+ * or timeout. No retries here: callers decide whether a send is worth
+ * retrying (auth mail is; a resend button exists).
  *
  * @param {{host: string, port: number, user: string, pass: string,
  *          from: string, fromName: string}} cfg
- * @param {{to: string, subject: string, text: string}} msg
+ * @param {{to: string, subject: string, text: string, html?: string}} msg
  */
 export function sendMail(cfg, msg) {
   const domain = cfg.from.split('@')[1] ?? cfg.host;
@@ -35,10 +36,29 @@ export function sendMail(cfg, msg) {
     `Date: ${new Date().toUTCString()}`,
     `Message-ID: <${randomBytes(9).toString('hex')}.${Date.now()}@${domain}>`,
     'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=utf-8',
-    'Content-Transfer-Encoding: 8bit',
-  ].join(CRLF);
-  const payload = `${headers}${CRLF}${CRLF}${toWireBody(msg.text)}${CRLF}.`;
+  ];
+  let body;
+  if (msg.html) {
+    const boundary = `part-${randomBytes(12).toString('hex')}`;
+    headers.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+    body = [
+      `--${boundary}`,
+      'Content-Type: text/plain; charset=utf-8',
+      'Content-Transfer-Encoding: 8bit',
+      '',
+      msg.text,
+      `--${boundary}`,
+      'Content-Type: text/html; charset=utf-8',
+      'Content-Transfer-Encoding: 8bit',
+      '',
+      msg.html,
+      `--${boundary}--`,
+    ].join('\n');
+  } else {
+    headers.push('Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: 8bit');
+    body = msg.text;
+  }
+  const payload = `${headers.join(CRLF)}${CRLF}${CRLF}${toWireBody(body)}${CRLF}.`;
 
   // The whole session is a fixed script: wait for the expected reply code,
   // send the next line. Any deviation aborts the connection.

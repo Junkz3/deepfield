@@ -47,17 +47,54 @@ const MAIL_ENABLED = Boolean(SMTP.host && SMTP.user && SMTP.pass);
 const ORIGIN = process.env.APP_ORIGIN ?? 'https://deepfield.repairmind.io';
 if (AUTH_ENABLED && !MAIL_ENABLED) console.warn('SMTP_* not set: signups will be auto-verified, password reset disabled');
 
+// The HTML alternative mirrors the app's dark control-room look (tokens.css
+// values inlined; email clients ignore stylesheets). The plain-text part is
+// the source of truth and must stay complete on its own.
+function authEmailHtml({ heading, body, cta, url, note }) {
+  return `<!doctype html>
+<html><body style="margin:0;padding:0;background-color:#0b0f14;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#0b0f14;padding:36px 16px;"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:460px;background-color:#11161d;border:1px solid #232c37;border-radius:12px;"><tr><td style="padding:36px 40px;font-family:Arial,Helvetica,sans-serif;">
+<img src="${ORIGIN}/logo-email.png" width="28" height="28" alt="Deepfield" style="display:block;border:0;">
+<h1 style="margin:16px 0 4px;font-size:22px;line-height:1.2;color:#dee7ef;">Deepfield</h1>
+<p style="margin:0 0 24px;font-size:11px;color:#6e7d8d;letter-spacing:0.12em;">DOCUMENT-UNIVERSE WORKSPACES</p>
+<p style="margin:0 0 10px;font-size:15px;line-height:1.6;color:#dee7ef;">${heading}</p>
+<p style="margin:0 0 28px;font-size:14px;line-height:1.6;color:#8b99a8;">${body}</p>
+<a href="${url}" style="display:inline-block;background-color:#ffb454;color:#0b0f14;font-size:14px;font-weight:bold;text-decoration:none;padding:12px 26px;border-radius:8px;">${cta}</a>
+<p style="margin:28px 0 0;font-size:12px;line-height:1.6;color:#6e7d8d;">Or paste this link into your browser:<br>
+<a href="${url}" style="color:#ffb454;text-decoration:none;word-break:break-all;">${url}</a></p>
+<p style="margin:20px 0 0;font-size:12px;line-height:1.6;color:#6e7d8d;">${note}</p>
+</td></tr></table>
+<p style="margin:20px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#4d5a68;">Deepfield, the agent that shows its evidence. Sent from ${ORIGIN.replace(/^https?:\/\//, '')}</p>
+</td></tr></table>
+</body></html>`;
+}
+
 async function sendAuthMail(kind, to, token) {
   const msg = kind === 'verify'
     ? {
       to,
       subject: 'Verify your email for Deepfield',
       text: `Welcome to Deepfield.\n\nConfirm this email address to unlock the agent on your account:\n\n  ${ORIGIN}/api/auth/verify?token=${token}\n\nThe link is valid for 24 hours. If you did not create this account, you can ignore this message.\n`,
+      html: authEmailHtml({
+        heading: 'Welcome to Deepfield.',
+        body: 'Confirm this email address to unlock the agent on your account.',
+        cta: 'Verify email',
+        url: `${ORIGIN}/api/auth/verify?token=${token}`,
+        note: 'The link is valid for 24 hours. If you did not create this account, you can ignore this message.',
+      }),
     }
     : {
       to,
       subject: 'Reset your Deepfield password',
       text: `Someone asked to reset the password for this Deepfield account.\n\nSet a new password here:\n\n  ${ORIGIN}/?reset=${token}\n\nThe link is valid for 1 hour and works once. If this was not you, you can ignore this message: your password is unchanged.\n`,
+      html: authEmailHtml({
+        heading: 'Password reset requested.',
+        body: 'Someone asked to reset the password for this Deepfield account. If this was you, set a new password below.',
+        cta: 'Set new password',
+        url: `${ORIGIN}/?reset=${token}`,
+        note: 'The link is valid for 1 hour and works once. If this was not you, you can ignore this message: your password is unchanged.',
+      }),
     };
   try {
     await sendMail(/** @type {any} */ (SMTP), msg);

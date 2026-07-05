@@ -6,6 +6,7 @@
 // Password reset rides the same gate: /?reset=<token> from the email.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { GalaxyGlyph } from './Sidebar';
 import './auth.css';
 
 type Phase =
@@ -140,7 +141,7 @@ function AuthScreen({ onSignedIn, resetToken, initialNotice, onResetConsumed }: 
   return (
     <div className="auth-screen">
       <div className="auth-card panel fade-up">
-        <span className="auth-mark" />
+        <span className="auth-mark"><GalaxyGlyph size={26} /></span>
         <h1 className="auth-title">Deepfield</h1>
         <p className="auth-tagline">{taglines[mode]}</p>
         {showEmail && (
@@ -251,7 +252,7 @@ function VerifyScreen({ email, linkFailed, onVerified }: {
   return (
     <div className="auth-screen">
       <div className="auth-card panel fade-up">
-        <span className="auth-mark" />
+        <span className="auth-mark"><GalaxyGlyph size={26} /></span>
         <h1 className="auth-title">Check your inbox</h1>
         <p className="auth-tagline">
           We sent a verification link to <strong>{email}</strong>. Click it to unlock the agent, then continue here.
