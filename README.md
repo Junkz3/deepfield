@@ -12,9 +12,17 @@ tools (parts stock, measurements), and delivers a cited step-by-step repair path
 explained confidence score. Every claim links to the exact page, table row, wiring fold-out or
 video second it came from.
 
+<img src="public/readme/universe.png" alt="The RepairCenter universe: 30 documents auto-organized into constellations by category, the agent core at the center">
+
+*The corpus after ingest: every document classified and placed into constellations, the agent core at the center.*
+
 The 3D universe is not decoration: it is the retrieval made visible. When the agent searches,
 lightning probes the candidate files; when it cites, the real pages fan out in space; documents
 outside the conversation scope fade to ghosts.
+
+<img src="public/readme/diagnosis.png" alt="A live diagnosis on Vultr: autonomous re-retrieval, a page-exact cited verdict with an explained 90 percent confidence, and the cited pages fanned out in the universe">
+
+*A live run on Vultr: the agent re-retrieves on its own, delivers a cited verdict with an explained confidence score, and the cited pages fan out in space.*
 
 ## Models (all on Vultr Serverless Inference)
 
@@ -39,6 +47,10 @@ taxonomy, the navigable 3D universe and page-exact citations work on any documen
 RepairCenter is the first app built on Deepfield: open the Studio (`/?studio`), name a
 workspace, drop a corpus, wire your tools, and the same plan-retrieve-cite loop serves legal
 discovery, clinical-trial matching or telecom field operations.
+
+<img src="public/readme/studio.png" alt="Deepfield Studio: workspace name, workflow presets, agent team, corpus drop zone and tool operations over the live universe">
+
+*Deepfield Studio (`/?studio`): the workspace creation screen. The universe populates live behind the card as the corpus is selected.*
 
 ## Multilingual by design
 
