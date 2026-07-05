@@ -111,10 +111,12 @@ npm test            # 108 unit tests (agent loop, taxonomy, teams, confidence ru
 npm run bench       # 39 hand-verified gold questions against the live agent (needs a key)
 ```
 
-With a Vultr Serverless Inference key the same UI runs live: put the key in `.env`
-(`VULTR_INFERENCE_API_KEY`, `VULTR_BASE_URL`), then open `/?driver=vultr`. The dev server (and
-the production proxy in `functions/api/agent.ts`) forwards only `/chat/completions` and
-`/rerank`; the key never reaches the browser.
+Copy `.env.example` to `.env` and add a Vultr Serverless Inference key to run the same UI
+live: set `VULTR_INFERENCE_API_KEY` (and `VULTR_BASE_URL`), then open `/?driver=vultr`. The
+dev server (and the production proxy in `functions/api/agent.ts`) forwards only
+`/chat/completions`, `/rerank` and `/audio/speech`; the key never reaches the browser.
+`.env.example` documents every other variable (accounts, mail, captcha, voice, offsite
+backup), all optional.
 
 ## Deploy it (live demo: https://deepfield.repairmind.io)
 
