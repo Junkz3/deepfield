@@ -1,4 +1,5 @@
 // The enterprise deliverable: a compiled, cited work order. The demo ends here.
+import { createPortal } from 'react-dom';
 import { compileWorkOrder } from '../../agent/loop';
 import type { Conversation, Document, WorkOrder } from '../../agent/types';
 
@@ -49,7 +50,11 @@ export function WorkOrderView({ conversation, docs, onClose }: { conversation: C
 
   const confColor = wo.confidence >= 0.7 ? 'var(--ok)' : wo.confidence >= 0.4 ? 'var(--warn)' : 'var(--err)';
 
-  return (
+  // The overlay is position:fixed, but a conversation renders it inside the
+  // glass .conv-panel, whose backdrop-filter makes it the containing block for
+  // fixed descendants (and overflow:hidden clips them). Portal to <body> so the
+  // work order is the full-viewport centered modal its CSS was built for.
+  return createPortal(
     <div className="wo-overlay" onClick={onClose}>
       <article className="wo-sheet fade-up" onClick={(e) => e.stopPropagation()}>
         <header className="wo-head">
@@ -138,6 +143,7 @@ export function WorkOrderView({ conversation, docs, onClose }: { conversation: C
           <button className="btn" onClick={onClose}>Close</button>
         </footer>
       </article>
-    </div>
+    </div>,
+    document.body,
   );
 }
