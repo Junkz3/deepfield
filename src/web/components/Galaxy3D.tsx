@@ -16,10 +16,19 @@ import displayFont from '@fontsource/space-grotesk/files/space-grotesk-latin-500
 
 const R = 2.75; // shell radius of the file planet
 
-// WebXR entry point. On localhost without a headset the built-in emulator
-// injects itself, so the VR path can be exercised (and filmed) headset-free.
+// WebXR entry point. The built-in emulator lets the VR path be exercised (and
+// filmed) without a headset. But @pmndrs/xr defaults `emulate` to 'metaQuest3'
+// when omitted (loads a ~112kB chunk, and on localhost injects an "Enter XR"
+// overlay over every header, including our demo-capture target `vite preview`).
+// So we must pass `emulate: false` to opt OUT: emulator on in dev, opt-in on a
+// built preview via ?xr (to film VR), off otherwise.
 // No synthetic room: our own deep space IS the environment.
-const xrStore = createXRStore({ emulate: { syntheticEnvironment: false } });
+const xrEmulatorEnabled =
+  import.meta.env.DEV ||
+  (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('xr'));
+const xrStore = createXRStore(
+  xrEmulatorEnabled ? { emulate: { syntheticEnvironment: false } } : { emulate: false },
+);
 
 const rnd = (seed: number) => Math.sin(seed * 127.1 + 311.7) * 0.5 + Math.sin(seed * 74.7) * 0.5;
 
