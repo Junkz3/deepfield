@@ -124,10 +124,13 @@ were reverted: the engine stays generic, the failure modes stay documented
    MiMo-V2.5-Pro (vision, 30s), Qwen3.5-397B (vision, 56s), Kimi-K2.6
    (full text layer, 6.3s) and DeepSeek-V4-Flash (full text layer, 3.2s) -
    while Nemotron-Omni stays wrong even with the full text layer attached
-   to its images. The path: swap or complement the answer reader (the
-   fastest correct option is text-layer DeepSeek when a text layer exists),
-   validated against the answer-mode slice of the gold set. Not done before
-   the deadline: an answer-model swap deserves its own measured pass.
+   to its images. The decisive pair: Nemotron-Cascade-2 answers CORRECTLY
+   on the text layer (6.2s) and WRONGLY on the page images. The failure is
+   visual structure reading, not the Nemotron family, and an all-NVIDIA
+   fix exists: Cascade-2 over the text layer whenever one exists. The
+   path: swap or complement the answer reader, validated against the
+   answer-mode slice of the gold set. Not done before the deadline: an
+   answer-model swap deserves its own measured pass.
 3. **Near-model transfer without a disclaimer.** iPhone 14 screen question
    can answer with opening steps from the iPhone SE 2020 BATTERY guide
    without flagging either mismatch (intermittent; run 4 passed). Confidence

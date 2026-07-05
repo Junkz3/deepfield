@@ -4,6 +4,10 @@
 // Measured 2026-07-05: MiMo-V2.5-Pro (vision), Qwen3.5-397B (vision),
 // Kimi-K2.6 (text) and DeepSeek-V4-Flash (text, 3.2s) all read it right;
 // Nemotron-Omni stays wrong even with the full text layer attached.
+// Decisive pair: Nemotron-Cascade-2 is CORRECT on the text layer (6.2s)
+// and WRONG on the page images - the failure is visual structure reading,
+// not the Nemotron family. An all-NVIDIA fix exists: Cascade-2 over the
+// text layer whenever one exists.
 // Usage: set -a; source .env; set +a; npx tsx scripts/bench-readers.ts
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -53,8 +57,10 @@ async function main() {
   const RUNS: [string, string, unknown][] = [
     ['vision', 'XiaomiMiMo/MiMo-V2.5-Pro', imagesContent],
     ['vision', 'Qwen/Qwen3.5-397B-A17B', imagesContent],
+    ['vision', 'nvidia/Nemotron-Cascade-2-30B-A3B', imagesContent],
     ['text', 'moonshotai/Kimi-K2.6', textContent],
     ['text', 'deepseek-ai/DeepSeek-V4-Flash', textContent],
+    ['text', 'nvidia/Nemotron-Cascade-2-30B-A3B', textContent],
     ['hybrid', 'nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16', hybridContent],
   ];
   for (const [kind, model, content] of RUNS) {
