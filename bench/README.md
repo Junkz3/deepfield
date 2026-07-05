@@ -119,6 +119,15 @@ were reverted: the engine stays generic, the failure modes stay documented
    itself as proof of coverage. Not a binding failure then: a polarity
    prior ("home emergency covers repairs") that survives even a spelled-out
    structural fact. Reverted like the rest; model-level stands confirmed.
+   THE FIX IS IDENTIFIED AND MEASURED (`scripts/bench-readers.ts`): on the
+   same evidence and prompt, four other catalog models read it right -
+   MiMo-V2.5-Pro (vision, 30s), Qwen3.5-397B (vision, 56s), Kimi-K2.6
+   (full text layer, 6.3s) and DeepSeek-V4-Flash (full text layer, 3.2s) -
+   while Nemotron-Omni stays wrong even with the full text layer attached
+   to its images. The path: swap or complement the answer reader (the
+   fastest correct option is text-layer DeepSeek when a text layer exists),
+   validated against the answer-mode slice of the gold set. Not done before
+   the deadline: an answer-model swap deserves its own measured pass.
 3. **Near-model transfer without a disclaimer.** iPhone 14 screen question
    can answer with opening steps from the iPhone SE 2020 BATTERY guide
    without flagging either mismatch (intermittent; run 4 passed). Confidence
