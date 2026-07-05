@@ -74,6 +74,34 @@ test('reset flow: token by mail, new password, all sessions revoked', () => {
   assert.equal(store.resetPassword(token, 'password3').ok, false);
 });
 
+test('login locks an account after repeated failures, then unlocks and resets', () => {
+  const store = fresh();
+  store.signup('user@example.com', 'password1');
+  // ten wrong attempts trip the lock
+  for (let i = 0; i < 10; i++) assert.equal(store.login('user@example.com', 'wrong').code, 401);
+  // even the correct password is now refused, with 429
+  const locked = store.login('user@example.com', 'password1');
+  assert.equal(locked.ok, false);
+  assert.equal(locked.code, 429);
+  // once the cooldown elapses, the correct password works again
+  store.db.users['user@example.com'].lock.until = Date.now() - 1;
+  assert.equal(store.login('user@example.com', 'password1').ok, true);
+  // a successful login clears the lock state
+  assert.equal(store.db.users['user@example.com'].lock, undefined);
+});
+
+test('login answers identically for an unknown email and a wrong password', () => {
+  const store = fresh();
+  store.signup('user@example.com', 'password1');
+  const wrongPw = store.login('user@example.com', 'nope');
+  const noAccount = store.login('ghost@example.com', 'whatever');
+  assert.equal(wrongPw.ok, false);
+  assert.deepEqual(
+    { ok: wrongPw.ok, code: wrongPw.code, error: wrongPw.error },
+    { ok: noAccount.ok, code: noAccount.code, error: noAccount.error },
+  );
+});
+
 test('mail cooldown holds for a minute per account', () => {
   const store = fresh();
   const r = store.signup('user@example.com', 'password1');

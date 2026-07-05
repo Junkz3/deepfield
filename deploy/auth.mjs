@@ -10,6 +10,11 @@ const SESSION_TTL_MS = 7 * 24 * 3600 * 1000;
 const VERIFY_TTL_MS = 24 * 3600 * 1000;
 const RESET_TTL_MS = 3600 * 1000;
 const MAIL_COOLDOWN_MS = 60 * 1000;
+// Per-account brute-force lockout, on top of the server's per-IP rate limit:
+// after this many consecutive failures the account is refused for a cooldown,
+// so a distributed attacker cannot grind passwords one IP at a time.
+const LOGIN_MAX_FAILS = 10;
+const LOGIN_LOCK_MS = 15 * 60 * 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Per-account store cap. Conversations (with attachments) grew past the old
 // 2 MB ceiling and got silently rejected; 8 MB covers a heavy demo account.
@@ -17,6 +22,12 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const STORE_MAX_BYTES = 8 * 1024 * 1024;
 
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
+
+// Fixed dummy credentials so a login for an unknown email still spends exactly
+// one scrypt. Without this, "no such account" returns before hashing and "wrong
+// password" returns after: the timing gap is an account-existence oracle.
+const DUMMY_SALT = 'deepfield.constant.work.salt';
+const DUMMY_HASH = scryptSync('x', DUMMY_SALT, 64);
 
 export class AuthStore {
   /** @param {string} dataDir @param {{userDailyLimit?: number, globalDailyLimit?: number}} [opts] */
@@ -64,13 +75,33 @@ export class AuthStore {
   login(email, password) {
     const e = String(email ?? '').trim().toLowerCase();
     const u = this.db.users[e];
-    if (!u || typeof password !== 'string') return { ok: false, error: 'unknown email or wrong password', code: 401 };
-    const hash = scryptSync(password, u.salt, 64);
-    const stored = Buffer.from(u.hash, 'hex');
-    if (hash.length !== stored.length || !timingSafeEqual(hash, stored)) {
+    const now = Date.now();
+    // Locked out by too many recent failures: refuse without even hashing.
+    if (u?.lock && u.lock.until > now) {
+      return { ok: false, error: 'too many failed attempts, try again in a few minutes', code: 429 };
+    }
+    // Constant work: always run one scrypt, against the real record or the dummy
+    // one, so an unknown email and a wrong password take the same time.
+    const pw = typeof password === 'string' ? password : '';
+    const salt = u ? u.salt : DUMMY_SALT;
+    const expected = u ? Buffer.from(u.hash, 'hex') : DUMMY_HASH;
+    const got = scryptSync(pw, salt, 64);
+    const matches = got.length === expected.length && timingSafeEqual(got, expected);
+    if (!u || typeof password !== 'string' || !matches) {
+      if (u) this.registerFailedLogin(u, now);
       return { ok: false, error: 'unknown email or wrong password', code: 401 };
     }
+    if (u.lock) { delete u.lock; this.save(); } // a good login clears the counter
     return { ok: true, userId: u.id };
+  }
+
+  /** Bump the failure counter; trip the lock (and reset the count) at the cap. */
+  registerFailedLogin(u, now) {
+    const lock = u.lock ?? { n: 0, until: 0 };
+    lock.n += 1;
+    if (lock.n >= LOGIN_MAX_FAILS) { lock.until = now + LOGIN_LOCK_MS; lock.n = 0; }
+    u.lock = lock;
+    this.save();
   }
 
   emailOf(userId) {
