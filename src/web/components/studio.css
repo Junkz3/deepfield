@@ -356,9 +356,9 @@
   padding: 3px 10px;
   border-radius: 999px;
   border: 1px solid var(--line-strong);
-  color: var(--fg2);
+  color: var(--text-dim);
   font-size: 10px;
   letter-spacing: 0.14em;
   transition: border-color var(--t-fast), color var(--t-fast);
 }
-.studio-close:hover { border-color: var(--accent); color: var(--fg0); }
+.studio-close:hover { border-color: var(--accent); color: var(--text); }
