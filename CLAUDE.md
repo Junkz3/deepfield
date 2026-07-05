@@ -71,7 +71,7 @@ the mic button is hidden and TTS falls back to Vultr, then the browser.
 - `public/corpus*` is a build artifact (not versioned). The full-corpus
   docs.json is tens of MB: keep it out of git and let the server gzip it.
 
-## Production VM (live at http://140.82.52.6)
+## Production VM (live at https://deepfield.repairmind.io)
 
 `./deploy/deploy.sh root@<vm-ip>` does everything (build, node install, rsync,
 systemd, port 80 via setcap). The local `.env` is rsynced to the server as-is:

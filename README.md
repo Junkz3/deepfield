@@ -91,7 +91,7 @@ With a Vultr Serverless Inference key the same UI runs live: put the key in `.en
 the production proxy in `functions/api/agent.ts`) forwards only `/chat/completions` and
 `/rerank`; the key never reaches the browser.
 
-## Deploy it (live demo: http://140.82.52.6)
+## Deploy it (live demo: https://deepfield.repairmind.io)
 
 The production target is a plain Vultr Cloud Compute VM, one command:
 
