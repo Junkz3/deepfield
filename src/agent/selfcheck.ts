@@ -56,8 +56,12 @@ export function pickFactPages(docs: Document[], count = 3): Page[] {
 
 /** Thousand separators differ across languages: the agent answers "£50 000"
  *  (French) where the policy prints "£50,000". Strip separators that sit
- *  before exactly 3 digits so decimals ("1,5") survive. */
+ *  before exactly 3 digits so decimals ("1,5") survive. Models also emit
+ *  typographic dashes and non-breaking spaces ("90‑135 VAC"): fold those to
+ *  ASCII before matching, or every ranged value fails the literal check. */
 const normalizeNumbers = (s: string) => s.toLowerCase()
+  .replace(/[‐-―−]/g, '-')
+  .replace(/[   ]/g, ' ')
   .replace(/(\d)[\s,'](?=\d{3}(?!\d))/g, '$1')
   .replace(/(\d)\s+(?=%)/g, '$1');
 

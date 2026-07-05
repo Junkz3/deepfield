@@ -75,4 +75,11 @@ describe('scoreProbe', () => {
     const p90 = { question: 'q', mustContain: ['90%'] };
     expect(scoreProbe('Remboursement : 90 % (p.15)', [cite('a', 15)], p90, { docId: 'a', page: 15 }).passed).toBe(true);
   });
+
+  it('matches ranges across unicode dashes and non-breaking spaces', () => {
+    const range = { question: 'q', mustContain: ['90-135', '3.6 a'] };
+    // The model writes U+2011 non-breaking hyphens and U+00A0 spaces
+    expect(scoreProbe('Rated 90‑135 VAC at 3.6 A (p.6)', [cite('a', 6)], range, { docId: 'a', page: 6 }).passed).toBe(true);
+    expect(scoreProbe('Rated 90–135 VAC (p.6)', [cite('a', 6)], range, { docId: 'a', page: 6 }).passed).toBe(true);
+  });
 });
