@@ -17,7 +17,7 @@ set -e
 command -v node >/dev/null || (apt-get update -qq && apt-get install -y -qq nodejs)
 # speech relay needs ffmpeg (ASR decode) and a python venv
 command -v ffmpeg >/dev/null || (apt-get update -qq && apt-get install -y -qq ffmpeg)
-python3 -c 'import venv' 2>/dev/null || (apt-get update -qq && apt-get install -y -qq python3-venv)
+python3 -c 'import ensurepip' 2>/dev/null || (apt-get update -qq && apt-get install -y -qq python3-venv)
 id repaircenter &>/dev/null || useradd --system --create-home repaircenter
 mkdir -p /opt/repaircenter/tts-relay
 SETUP
@@ -37,8 +37,12 @@ echo "PORT=8080" >> /opt/repaircenter/.env.tmp || true
 sort -u /opt/repaircenter/.env /opt/repaircenter/.env.tmp 2>/dev/null > /opt/repaircenter/.env.merged || cp /opt/repaircenter/.env /opt/repaircenter/.env.merged
 mv /opt/repaircenter/.env.merged /opt/repaircenter/.env
 rm -f /opt/repaircenter/.env.tmp
-# speech relay venv (idempotent; the unit runs venv/bin/python)
-[ -x /opt/repaircenter/tts-relay/venv/bin/python ] || python3 -m venv /opt/repaircenter/tts-relay/venv
+# speech relay venv (idempotent; the unit runs venv/bin/python). pip is the
+# real marker: a venv created without ensurepip has python but no pip.
+[ -x /opt/repaircenter/tts-relay/venv/bin/pip ] || {
+  rm -rf /opt/repaircenter/tts-relay/venv
+  python3 -m venv /opt/repaircenter/tts-relay/venv
+}
 /opt/repaircenter/tts-relay/venv/bin/pip install -q -r /opt/repaircenter/tts-relay/requirements.txt
 chown -R repaircenter:repaircenter /opt/repaircenter
 # port 80 needs the capability, not root
