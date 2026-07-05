@@ -819,7 +819,9 @@
   flex-direction: column;
   gap: var(--sp-3);
   padding: var(--sp-3) var(--sp-4);
-  border-left: 2px solid var(--accent-dim);
+  /* accent-dim (0.14 alpha) made this rail invisible; a mid-strength accent
+     reads as the agent's guidance without shouting like the verdict's solid rail */
+  border-left: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
   background: rgba(255, 255, 255, 0.02);
   border-radius: 0 var(--radius-md) var(--radius-md) 0;
   font-size: var(--fs-md);
