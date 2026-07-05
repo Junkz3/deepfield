@@ -97,11 +97,21 @@ were reverted: the engine stays generic, the failure modes stay documented
    router", the agent quotes the sample key printed in a manual illustration
    as if it were the user's, even while correctly naming the type label as
    the source. The bench kills this with mustNotContain.
-2. **Exclusion polarity.** "Are repairs to a boiler over 15 years old
-   covered?" answers "Yes." while the page lists it under an exclusions
-   heading whose title sits outside the text snippet (intermittent: correct
-   on some runs). Structure-aware reading of what-is-NOT-covered sections
-   is the open problem.
+2. **Exclusion polarity - fully characterized, model-level.** "Are repairs
+   to a boiler over 15 years old covered?" answers "Yes." while the item
+   sits in a "What is not covered" list. Everything upstream was ruled out
+   by measurement: the heading page IS retrieved (cited second), a
+   deterministic splice that guarantees the heading page in the evidence
+   changed nothing, and re-ordering the evidence into reading order (heading
+   page first) still produced "Yes, covered (p.11)" - citing the very page
+   that prints the exclusions heading. A one-line prompt guard had already
+   measured ineffective. Both deterministic mechanisms were reverted
+   (neutral on target, and the discipline is: what does not measurably fix
+   does not ship). Conclusion: the reader model does not bind a continued
+   list to its section heading across page images or across a page's own
+   vertical structure; the visible "What is covered" title wins. This needs
+   a stronger reader or model-level work, not engine plumbing. The bench
+   holds the case; any future model swap gets measured against it.
 3. **Near-model transfer without a disclaimer.** iPhone 14 screen question
    can answer with opening steps from the iPhone SE 2020 BATTERY guide
    without flagging either mismatch (intermittent; run 4 passed). Confidence
