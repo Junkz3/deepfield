@@ -21,7 +21,7 @@ SETUP
 
 echo "== sync artifacts =="
 rsync -az --delete dist "$HOST:$APP_DIR/"
-rsync -az deploy/server.mjs "$HOST:$APP_DIR/deploy/"
+rsync -az deploy/server.mjs deploy/auth.mjs "$HOST:$APP_DIR/deploy/"
 rsync -az .env "$HOST:$APP_DIR/.env"
 rsync -az deploy/repaircenter.service "$HOST:/etc/systemd/system/repaircenter.service"
 
