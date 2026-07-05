@@ -1,8 +1,20 @@
 # <img src="public/favicon.svg" width="30" height="30" alt=""> Deepfield
 
-[<img src="public/readme/demo-thumb.png" alt="Watch the one-minute Deepfield demo on YouTube">](https://www.youtube.com/watch?v=fGyVvlguQbo)
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=fGyVvlguQbo"><img src="public/readme/demo-thumb.png" width="760" alt="Watch the one-minute Deepfield demo on YouTube"></a>
+</p>
 
-*One-minute demo. [Watch it on YouTube.](https://www.youtube.com/watch?v=fGyVvlguQbo)*
+<p align="center">
+  <em>One-minute demo. <a href="https://www.youtube.com/watch?v=fGyVvlguQbo">Watch it on YouTube.</a></em>
+</p>
+
+<p align="center">
+  <a href="https://deepfield.repairmind.io"><img src="https://img.shields.io/badge/live-deepfield.repairmind.io-ffb454" alt="Live demo"></a>
+  <a href="https://github.com/Junkz3/deepfield/stargazers"><img src="https://img.shields.io/github/stars/Junkz3/deepfield?style=flat&color=ffb454" alt="GitHub stars"></a>
+  <img src="https://img.shields.io/badge/RAISE%20Summit-Vultr%20track-63d1de" alt="RAISE Summit, Vultr track">
+  <img src="https://img.shields.io/badge/inference-NVIDIA%20Nemotron-76b900" alt="NVIDIA Nemotron">
+  <img src="https://img.shields.io/badge/built-React%20%2B%20Three.js-61dafb" alt="React and Three.js">
+</p>
 
 Drop any document corpus in, get a grounded enterprise agent out. Deepfield reads every page
 as an image (manuals, policies, scanned fold-outs, even videos), auto-organizes the files into
