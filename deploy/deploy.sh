@@ -28,7 +28,7 @@ rsync -az deploy/repaircenter.service "$HOST:/etc/systemd/system/repaircenter.se
 echo "== (re)start =="
 ssh "$HOST" bash -s <<'START'
 set -e
-echo "PORT=80" >> /opt/repaircenter/.env.tmp || true
+echo "PORT=8080" >> /opt/repaircenter/.env.tmp || true
 sort -u /opt/repaircenter/.env /opt/repaircenter/.env.tmp 2>/dev/null > /opt/repaircenter/.env.merged || cp /opt/repaircenter/.env /opt/repaircenter/.env.merged
 mv /opt/repaircenter/.env.merged /opt/repaircenter/.env
 rm -f /opt/repaircenter/.env.tmp
