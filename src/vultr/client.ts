@@ -1,5 +1,5 @@
 import type { ClassifyInput, DocMeta, ModelDriver, SufficiencyVerdict } from '../agent/driver';
-import type { Diagnosis, Page, PageKind, PlanAction, ScoredPage } from '../agent/types';
+import type { Diagnosis, Page, PageKind, PlanAction, ScoredPage, Turn } from '../agent/types';
 import { FREEFORM_SYMPTOM } from '../agent/types';
 import { workflowProfile } from '../agent/workflow';
 import type { WorkflowProfile } from '../agent/workflow';
@@ -80,11 +80,16 @@ export class VultrDriver implements ModelDriver {
   private scopeHasSchematic = true; // updated on every retrieve
 
 
-  async plan(q: { device: string; symptom: string; hasPhoto: boolean; userInput?: string }): Promise<PlanAction> {
+  async plan(q: { device: string; symptom: string; hasPhoto: boolean; userInput?: string; history?: Turn[] }): Promise<PlanAction> {
     // The find-video action arrives as a raw token: turn it into real intent.
     const userInput = q.userInput === 'find-video'
       ? 'Show the video walkthrough for this repair. Phrase the retrieval query as: video walkthrough <device> <faulty component> replacement.'
       : q.userInput;
+    // Recent turns let a follow-up ("are you sure?", "and page 20?") be
+    // planned against the exchange, not read as a fresh standalone request.
+    const convo = q.history && q.history.length > 0
+      ? `\nRecent conversation (the user input above may be a follow-up to it - resolve any reference against it):\n${q.history.map((t) => `- Q: ${t.question} / A: ${t.answer.slice(0, 200)}`).join('\n')}`
+      : '';
     // Multi-agent routing lives INSIDE the plan call: with several active
     // agents the same prompt gains a roster and returns "agentId" - zero
     // extra inference calls, and byte-identical prompt with a solo team.
@@ -99,19 +104,45 @@ export class VultrDriver implements ModelDriver {
       : '{"goal": string, "queries": [string], "intent": "diagnose"|"question"|"scope"}';
     const hint = routed ? "follow the routed agent's evidence focus" : workflowProfile().retrievalHint;
     const text = await chatText(this.t, MODELS.omni,
-      `You are ${role} planning evidence retrieval from a knowledge base that holds PAGINATED DOCUMENT PAGES and TIMESTAMPED VIDEO WALKTHROUGH SEGMENTS.\n${q.symptom === FREEFORM_SYMPTOM ? `User request: ${q.device}` : `${workflowProfile().subjectNoun}: ${q.device}\n${workflowProfile().issueNoun}: ${q.symptom}`}\nUser input: ${userInput ?? 'none'}${roster}\nThis is quick planning, not analysis: keep any internal reasoning under 30 words. Return STRICT JSON: ${jsonShape} - intent is "scope" when the user asks what this workspace or assistant covers, supports or can help with, in any language, however informal (e.g. "what devices can you fix?", "t'as quoi comme appareils?") - a question ABOUT the assistant or its collection is always scope; otherwise "diagnose" for faults/symptoms to troubleshoot, "question" for how-to, maintenance, specs or informational asks; one focused retrieval query (${hint}; start the query with "video walkthrough" when the user wants a demonstration). The retrieval query MUST be written in English (the corpus language) regardless of the user's language; write the goal in ${AGENT_LANG}.`, 8000);
-    return extractJson<PlanAction>(text, { goal: `Diagnose ${q.symptom}`, queries: [`${q.device} ${q.symptom}`] });
+      `You are ${role} planning evidence retrieval from a knowledge base that holds PAGINATED DOCUMENT PAGES and TIMESTAMPED VIDEO WALKTHROUGH SEGMENTS.\n${q.symptom === FREEFORM_SYMPTOM ? `User request: ${q.device}` : `${workflowProfile().subjectNoun}: ${q.device}\n${workflowProfile().issueNoun}: ${q.symptom}`}\nUser input: ${userInput ?? 'none'}${roster}${convo}\nThis is quick planning, not analysis: keep any internal reasoning under 30 words. Return STRICT JSON: ${jsonShape} - intent is "scope" ONLY when the user asks about the assistant or workspace ITSELF: what it can do, or which documents, topics or categories it holds (e.g. "what can you help with?", "which manuals do you have?", "t'as quoi comme appareils?"). A question about a SPECIFIC subject - whether a particular contract, device, product or document covers, includes, supports, allows or handles something - is NEVER scope even when it uses words like "cover" or "support": classify it "diagnose" for a fault or symptom to troubleshoot, otherwise "question" for how-to, coverage, eligibility, specs or any informational ask about the content. Use one focused retrieval query (${hint}; start the query with "video walkthrough" when the user wants a demonstration). The retrieval query MUST be written in English (the corpus language) regardless of the user's language; write the goal in ${AGENT_LANG}.`, 8000);
+    const parsed = extractJson<PlanAction>(text, { goal: `Diagnose ${q.symptom}`, queries: [`${q.device} ${q.symptom}`] });
+    // The model sometimes echoes the field label into the query string
+    // ("retrieval query: ..."); strip such prefixes deterministically (model
+    // JSON is validated, never trusted).
+    const cleanQuery = (s: string) => String(s).replace(/^\s*(the\s+)?(retrieval|search)?\s*quer(?:y|ies)\s*[:\-]\s*/i, '').trim();
+    const queries = (parsed.queries ?? []).map(cleanQuery).filter(Boolean);
+    return { ...parsed, queries: queries.length > 0 ? queries : [`${q.device} ${q.symptom}`] };
   }
 
-  async answer(question: string, evidence: Page[], mode: 'qa' | 'deep'): Promise<string> {
+  async answer(question: string, evidence: Page[], mode: 'qa' | 'deep', context?: Turn[]): Promise<string> {
     const depth = mode === 'deep'
       ? 'Give the COMPLETE picture: explain the reasoning, the relevant values, the alternatives and the pitfalls the pages mention. Use short markdown sections. Aim for thorough - several paragraphs are welcome.'
       : 'Answer fully but stay on the question. Use short paragraphs or a list when the pages give steps.';
-    const shown = evidence.slice(0, 4);
+    // A follow-up ("are you sure?", "what about theft?") is resolved against
+    // the prior exchange, never read as a fresh standalone question.
+    const convo = context && context.length > 0
+      ? `This is an ongoing conversation. Earlier exchange(s):\n${context.map((t) => `User asked: ${t.question}\nYou answered: ${t.answer.slice(0, 400)}`).join('\n')}\nThe user's latest message may be a follow-up (e.g. "are you sure?", "and page 20?"): resolve it against that exchange and re-answer the underlying question from the pages below. `
+      : '';
+    // The coverage/exclusion polarity rule is meaningful only for answer-mode
+    // verticals reading real policy/manual pages - never for the synthetic
+    // workspace inventory (a scope answer), and never for repair diagnostics.
+    // Injecting it elsewhere pollutes the answer ("the pages do not contain a
+    // 'what is covered' section").
+    const isInventory = evidence.length === 1 && evidence[0]?.docId === 'workspace-index';
+    const coverageDirective = workflowProfile().decisionMode === 'answer' && !isInventory
+      ? ' Before concluding that something is covered or allowed, locate BOTH the "what is covered" and the "what is not covered" / "exclusions" sections across ALL the attached pages: a numbered list often continues onto the next page, so an item can sit under a heading printed on the PREVIOUS page (a page that begins mid-list at item 2 with no heading is a continuation). If the item in question falls under "what is not covered", an exclusion, an age or time limit, a waiting period or a cap, then it is NOT covered - say it is excluded and quote the clause; never answer affirmatively when an exclusion applies.'
+      : '';
+    // Read same-document pages in ascending page order so a list or table
+    // that continues across a page break (an exclusions list whose heading is
+    // on the previous page) is read in its natural sequence. Document order
+    // (which manual the ranking put first) is preserved.
+    const ranked = evidence.slice(0, 4);
+    const docOrder = [...new Set(ranked.map((p) => p.docId))];
+    const shown = docOrder.flatMap((id) => ranked.filter((p) => p.docId === id).sort((a, b) => a.page - b.page));
     const pageList = shown.map((pg) => `p.${pg.page}`).join(', ');
-    const parts: unknown[] = [{ type: 'text', text: `You are a technical assistant answering from the attached manual pages ONLY. Question: ${question}
+    const parts: unknown[] = [{ type: 'text', text: `You are a technical assistant answering from the attached manual pages ONLY. ${convo}Question: ${question}
 Attached pages, in this order: ${pageList}.
-${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque values EXACTLY as printed; cite pages by their REAL numbers from the list above, like (${shown[0] ? `p.${shown[0].page}` : 'p.12'}), after each fact. If the pages do not contain the answer, say exactly what is missing. Keep any internal reasoning under 60 words, then write the answer.` }];
+${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque values EXACTLY as printed; cite pages by their REAL numbers from the list above, like (${shown[0] ? `p.${shown[0].page}` : 'p.12'}), after each fact.${coverageDirective} If the pages do not contain the answer, say exactly what is missing. Keep any internal reasoning under 60 words, then write the answer.` }];
     for (const p of shown) {
       // Synthetic text pages (workspace inventory for scope questions) ride
       // as text blocks; real manual pages ride as images.

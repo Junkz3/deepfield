@@ -1,4 +1,4 @@
-import type { Conversation, Diagnosis, Document, GuidedStep, PartLine, PhaseEvent, SafetyInfo, ScoredPage, WorkOrder } from './types';
+import type { Conversation, Diagnosis, Document, GuidedStep, PartLine, PhaseEvent, SafetyInfo, ScoredPage, Turn, WorkOrder } from './types';
 import { FREEFORM_SYMPTOM } from './types';
 import type { ModelDriver } from './driver';
 import { candidatePages, pageTitle, scopeSummary, trimPool } from './taxonomy';
@@ -21,9 +21,26 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
   const events: PhaseEvent[] = [];
   const emit = (e: PhaseEvent) => { events.push(e); return e; };
 
+  // Raw action tokens (button clicks) are not user prose: they neither seed
+  // the conversation history nor stand in as a follow-up question.
+  const ACTION_INPUT = /^(report-measurement:|find-video$|order-part:|show-citation:|compile-work-order$|open-ingest$|explain-deep$)/;
+  // Conversation memory (last 2 resolved turns): threaded into plan and answer
+  // so a follow-up ("are you sure?", "and page 20?") is understood against the
+  // exchange, not read as a fresh standalone request. Vertical-agnostic.
+  const originalQuestion = conversation.symptom === FREEFORM_SYMPTOM
+    ? conversation.device
+    : `${conversation.device}: ${conversation.symptom}`;
+  const history: Turn[] = conversation.steps
+    .filter((s) => s.answer ?? s.instruction)
+    .slice(-2)
+    .map((s) => ({
+      question: s.userInput && !ACTION_INPUT.test(s.userInput) ? s.userInput : originalQuestion,
+      answer: (s.answer ?? s.instruction ?? '').replace(/\s+/g, ' ').trim().slice(0, 500),
+    }));
+
   // PLAN
   yield emit({ phase: 'plan', summary: 'Planning what evidence is needed' });
-  const plan = await driver.plan({ ...q, hasPhoto: conversation.attachments.length > 0, userInput });
+  const plan = await driver.plan({ ...q, hasPhoto: conversation.attachments.length > 0, userInput, history });
   yield emit({ phase: 'plan', summary: plan.goal });
 
   // ROUTE: with a team of active agents, the plan named the specialist for
@@ -41,16 +58,55 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     if (team.length > 1) yield emit({ phase: 'plan', summary: `Routed to ${chosen.label}` });
   }
 
+  // EXPLICIT PAGE REFERENCE. The user points at a page number ("look at page
+  // 20", "a la page 20", "seite 20"): a direct instruction that overrides
+  // similarity retrieval - fetch those pages from the in-scope corpus and read
+  // them, preferring documents already cited in this conversation. The pattern
+  // requires the word "page" (any of a few languages) or a dotted "p."/"pg."
+  // so error codes like P0301 are never mistaken for a page number.
+  const pageRefs = userInput && !ACTION_INPUT.test(userInput)
+    ? [...userInput.matchAll(/(?:\b(?:pages?|páginas?|seiten?|pagine?)\s*\.?\s*|\bp{1,2}g?\.\s*)(\d{1,4})\b/gi)]
+        .map((m) => Number(m[1])).filter((n) => Number.isFinite(n) && n > 0)
+    : [];
+  if (pageRefs.length > 0 && userInput && driver.answer) {
+    const scoped = candidatePages(docs, conversation.device);
+    const citedDocs = new Set(conversation.steps.flatMap((s) => s.citations.map((c) => c.docId)));
+    const preferred = scoped.filter((p) => pageRefs.includes(p.page) && citedDocs.has(p.docId));
+    const pages = (preferred.length > 0 ? preferred : scoped.filter((p) => pageRefs.includes(p.page))).slice(0, 4);
+    if (pages.length > 0) {
+      yield emit({ phase: 'reason', summary: `Opening the page(s) you pointed to: ${[...new Set(pages.map((p) => p.page))].join(', ')}` });
+      const text = await driver.answer(userInput, pages, 'qa', history);
+      const citations = pages.map((p) => toCitation({ page: p, score: 0 }));
+      const conf = computeConfidence({ exactCodeMatch: false, corroboratingCitations: Math.max(0, new Set(pages.map((p) => p.docId)).size - 1), requiredPageMissing: false });
+      yield emit({ phase: 'decide', summary: 'Answer read from the page you cited' });
+      return {
+        index: conversation.steps.length, phaseEvents: events, agentLabel,
+        instruction: text.split('\n')[0].slice(0, 200),
+        answer: text,
+        citations,
+        proposedNext: [
+          { label: 'Explain in depth', action: 'explain-deep' },
+          { label: 'Compile work order', action: 'compile-work-order' },
+        ],
+        confidence: conf.value, confidenceReason: conf.reason, status: 'ok',
+      };
+    }
+  }
+
   // WORKSPACE-SCOPE questions ("what can you help me with?"): the answer is
   // the workspace's own taxonomy, not any manual page. The inventory is
-  // deterministic; the model only phrases it in the user's language.
+  // deterministic; the model only phrases it in the user's language. The
+  // "cover"/"support" collision that used to misroute CONTENT questions here
+  // is fixed upstream in the plan prompt (a scope label now means the question
+  // is about the assistant ITSELF); the history reaches the answer so a scope
+  // follow-up resolves against the exchange.
   if (plan.intent === 'scope' && driver.answer) {
     yield emit({ phase: 'reason', summary: 'Reading the workspace index itself' });
     const inventory = scopeSummary(docs);
     const inventoryPage = { docId: 'workspace-index', page: 1, imageUrl: '', text: inventory, kind: 'other' as const };
     const text = await driver.answer(
       userInput && userInput.trim().length > 0 ? userInput : `${conversation.device}: ${conversation.symptom}`,
-      [inventoryPage], 'qa',
+      [inventoryPage], 'qa', history,
     );
     yield emit({ phase: 'decide', summary: 'Answered from the workspace index' });
     return {
@@ -160,7 +216,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
     yield emit({ phase: 'reason', summary: deepDive ? 'Re-reading the cited pages in depth' : 'Reading the pages to answer' });
     const questionText = deepDive
       ? `Explain in depth: ${conversation.symptom} (device: ${conversation.device})`
-      : (userInput && !/^(report-measurement:|find-video$|order-part:|show-citation:|compile-work-order$|open-ingest$|explain-deep$)/.test(userInput) ? userInput : `${conversation.device}: ${conversation.symptom}`);
+      : (userInput && !ACTION_INPUT.test(userInput) ? userInput : `${conversation.device}: ${conversation.symptom}`);
     // Scores accumulated across rounds come from DIFFERENT queries (the
     // assess followups), so they are not comparable: a specs page can outrank
     // the page holding the actual value. Worse, similarity ranks covers and
@@ -178,7 +234,7 @@ export async function* runStep(input: StepInput, driver: ModelDriver): AsyncGene
         if (rescored.length > 0) bestFirst = rescored;
       } catch { /* keep the cross-round order */ }
     }
-    const text = await driver.answer(questionText, bestFirst.map((r) => r.page), deepDive ? 'deep' : 'qa');
+    const text = await driver.answer(questionText, bestFirst.map((r) => r.page), deepDive ? 'deep' : 'qa', deepDive ? undefined : history);
     const citations = bestFirst.map(toCitation);
     const distinct = Math.max(new Set(retrieved.map((r) => r.page.docId)).size, new Set(retrieved.map((r) => r.page.kind)).size);
     const conf = computeConfidence({ exactCodeMatch: false, corroboratingCitations: distinct - 1, requiredPageMissing: evidenceIncomplete });

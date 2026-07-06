@@ -1,4 +1,4 @@
-import type { Diagnosis, DocType, Page, PageKind, PlanAction, ScoredPage } from './types';
+import type { Diagnosis, DocType, Page, PageKind, PlanAction, ScoredPage, Turn } from './types';
 import { E3_DIAGNOSIS, E3_PLAN, E3_SUFFICIENCY } from './fixtures/e3-case';
 import type { CalibrationInput } from './calibrate';
 import { heuristicProfile } from './calibrate';
@@ -19,14 +19,15 @@ export interface SufficiencyVerdict {
 }
 
 export interface ModelDriver {
-  plan(q: { device: string; symptom: string; hasPhoto: boolean; userInput?: string }): Promise<PlanAction>;
+  plan(q: { device: string; symptom: string; hasPhoto: boolean; userInput?: string; history?: Turn[] }): Promise<PlanAction>;
   retrieve(query: string, candidates: Page[]): Promise<ScoredPage[]>;
   assessSufficiency(q: { device: string; symptom: string }, found: ScoredPage[]): Promise<SufficiencyVerdict>;
   diagnose(q: { device: string; symptom: string }, evidence: Page[], techPhoto?: string): Promise<Diagnosis>;
   classify(input: ClassifyInput): Promise<DocMeta>;
   /** Free-form grounded answer (questions and deep dives) - optional; the
-   *  loop falls back to the diagnosis pipeline when a driver lacks it. */
-  answer?(question: string, evidence: Page[], mode: 'qa' | 'deep'): Promise<string>;
+   *  loop falls back to the diagnosis pipeline when a driver lacks it.
+   *  `context` carries recent turns so a follow-up resolves against them. */
+  answer?(question: string, evidence: Page[], mode: 'qa' | 'deep', context?: Turn[]): Promise<string>;
   /** Deepfield calibration: shape the workflow profile from the dropped
    *  corpus - optional; callers fall back to the keyword heuristic. */
   calibrate?(input: CalibrationInput): Promise<WorkflowProfile>;

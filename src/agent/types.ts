@@ -14,6 +14,12 @@ export interface ScoredPage { page: Page; score: number }
  *  the planner presents these as one user request, not as a device name. */
 export const FREEFORM_SYMPTOM = 'as described by the technician';
 
+/** One resolved turn of the conversation: the question the user asked and the
+ *  answer the agent gave. Threaded into plan/answer so a follow-up ("are you
+ *  sure?", "and page 20?") resolves against the exchange instead of being read
+ *  as a brand-new standalone question. Vertical-agnostic. */
+export interface Turn { question: string; answer: string }
+
 export interface PlanAction { goal: string; queries: string[]; intent?: 'diagnose' | 'question' | 'scope'; agentId?: string }
 export interface Diagnosis { component: string; cause: string; checks: string[]; instruction?: string; componentKey?: string; tools?: { id: string; args?: Record<string, string> }[]; followups?: string[] }
 export interface PartLine { ref: string; name: string; inStock: boolean; price?: number; leadDays?: number }
