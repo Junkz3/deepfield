@@ -118,7 +118,10 @@ for (const m of manifest.docs) {
       const textBlocks = await extractTextBlocks(pdf, p);
       docPages[i] = {
         docId: m.id, page: p, imageUrl: `/${CORPUS_DIR}/${m.id}/p${p}.png`,
-        text: text.slice(0, 600) || undefined,
+        // Store the full page text (capped generously): the answer model reads
+        // it alongside the image for answer-mode verticals, so a section heading
+        // ("what is not covered") that sits deep in the page must survive.
+        text: text.slice(0, 3000) || undefined,
         kind: m.kinds[String(p)] ?? 'other',
         region: m.regions?.[String(p)],
         textBlocks: textBlocks.length > 0 ? textBlocks : undefined,

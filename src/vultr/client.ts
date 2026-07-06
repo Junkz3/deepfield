@@ -129,7 +129,12 @@ export class VultrDriver implements ModelDriver {
     // Injecting it elsewhere pollutes the answer ("the pages do not contain a
     // 'what is covered' section").
     const isInventory = evidence.length === 1 && evidence[0]?.docId === 'workspace-index';
-    const coverageDirective = workflowProfile().decisionMode === 'answer' && !isInventory
+    // Answer-mode verticals reading real policy/manual pages get two extras a
+    // repair diagnostic or a scope inventory answer must not: the page TEXT
+    // alongside its image (a section heading read as reliable tokens, not parsed
+    // from pixels) and the exclusion-polarity rule.
+    const coverageAware = workflowProfile().decisionMode === 'answer' && !isInventory;
+    const coverageDirective = coverageAware
       ? ' Before concluding that something is covered or allowed, locate BOTH the "what is covered" and the "what is not covered" / "exclusions" sections across ALL the attached pages: a numbered list often continues onto the next page, so an item can sit under a heading printed on the PREVIOUS page (a page that begins mid-list at item 2 with no heading is a continuation). If the item in question falls under "what is not covered", an exclusion, an age or time limit, a waiting period or a cap, then it is NOT covered - say it is excluded and quote the clause; never answer affirmatively when an exclusion applies.'
       : '';
     // Read same-document pages in ascending page order so a list or table
@@ -140,21 +145,26 @@ export class VultrDriver implements ModelDriver {
     const docOrder = [...new Set(ranked.map((p) => p.docId))];
     const shown = docOrder.flatMap((id) => ranked.filter((p) => p.docId === id).sort((a, b) => a.page - b.page));
     const pageList = shown.map((pg) => `p.${pg.page}`).join(', ');
-    const parts: unknown[] = [{ type: 'text', text: `You are a technical assistant answering from the attached manual pages ONLY. ${convo}Question: ${question}
+    const promptPart = { type: 'text' as const, text: `You are a technical assistant answering from the attached manual pages ONLY. ${convo}Question: ${question}
 Attached pages, in this order: ${pageList}.
-${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque values EXACTLY as printed; cite pages by their REAL numbers from the list above, like (${shown[0] ? `p.${shown[0].page}` : 'p.12'}), after each fact.${coverageDirective} If the pages do not contain the answer, say exactly what is missing. Keep any internal reasoning under 60 words, then write the answer.` }];
+${depth} Answer in ${AGENT_LANG}; keep part numbers, codes, units and torque values EXACTLY as printed; cite pages by their REAL numbers from the list above, like (${shown[0] ? `p.${shown[0].page}` : 'p.12'}), after each fact.${coverageDirective} If the pages do not contain the answer, say exactly what is missing. Keep any internal reasoning under 60 words, then write the answer.` };
+    // One block per page so the retry ladder still sheds whole PAGES. Answer-mode
+    // real pages carry BOTH their text (headings, exclusions) and the image; the
+    // synthetic inventory rides as text; repair pages stay image-only.
+    const pageBlocks: unknown[][] = [];
     for (const p of shown) {
-      // Synthetic text pages (workspace inventory for scope questions) ride
-      // as text blocks; real manual pages ride as images.
-      if (p.imageUrl) parts.push({ type: 'image_url', image_url: { url: await toDataUrl(p.imageUrl) } });
-      else parts.push({ type: 'text', text: `[p.${p.page}] ${p.text ?? ''}` });
+      if (!p.imageUrl) { pageBlocks.push([{ type: 'text', text: `[p.${p.page}] ${p.text ?? ''}` }]); continue; }
+      const block: unknown[] = [];
+      if (coverageAware && p.text) block.push({ type: 'text', text: `Text of p.${p.page} (read its headings here; the image below is the same page):\n${p.text}` });
+      block.push({ type: 'image_url', image_url: { url: await toDataUrl(p.imageUrl) } });
+      pageBlocks.push(block);
     }
     // Same two-regime retry as diagnose: brevity directive first (rumination
     // burns the cap on sparse evidence), then shed pages (density burns it).
     for (const [i, take] of [4, 4, 2, 1].entries()) {
-      const head = i === 0 ? parts[0]
-        : { type: 'text', text: `YOUR PREVIOUS ATTEMPT WAS CUT BY THE TOKEN CAP BEFORE ANY OUTPUT. Do NOT deliberate: at most 20 words of internal reasoning, then write the answer immediately.\n${(parts[0] as { text: string }).text}` };
-      const attempt = [head, ...parts.slice(1, 1 + take)];
+      const head = i === 0 ? promptPart
+        : { type: 'text' as const, text: `YOUR PREVIOUS ATTEMPT WAS CUT BY THE TOKEN CAP BEFORE ANY OUTPUT. Do NOT deliberate: at most 20 words of internal reasoning, then write the answer immediately.\n${promptPart.text}` };
+      const attempt = [head, ...pageBlocks.slice(0, take).flat()];
       let text: string;
       try {
         text = (await chatText(this.t, MODELS.omni, attempt, 8000)).trim();

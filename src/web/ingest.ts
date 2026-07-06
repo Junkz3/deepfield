@@ -64,7 +64,7 @@ export async function deepenDocument(
       canvas.height = viewport.height;
       await page.render({ canvasContext: canvas.getContext('2d')!, viewport } as any).promise;
       const text = (await page.getTextContent()).items.map((it: any) => it.str ?? '').join(' ');
-      batch.push({ docId: doc.id, page: i, imageUrl: canvas.toDataURL('image/png'), text: text.slice(0, 600) || undefined, kind: 'other' });
+      batch.push({ docId: doc.id, page: i, imageUrl: canvas.toDataURL('image/png'), text: text.slice(0, 3000) || undefined, kind: 'other' });
     }
     if (driver.tagPages) {
       try {
@@ -100,7 +100,7 @@ export async function ingestFile(file: File, driver: ModelDriver): Promise<Docum
     docId: slug(file.name),
     page: i + 1,
     imageUrl: img,
-    text: pageTexts[i]?.slice(0, 600),
+    text: pageTexts[i]?.slice(0, 3000),
     kind: meta.pageKinds[i] ?? 'other',
   }));
 
